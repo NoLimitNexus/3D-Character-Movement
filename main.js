@@ -44,6 +44,9 @@ function animate() {
   updatePlayerAndCamera(delta);
   // Also update small rocks spawned from big rocks.
   if (window.updateFlyingSmallRocks) { window.updateFlyingSmallRocks(delta); }
+  // Update enemies and check enemy hits.
+  if (window.updateEnemies) { window.updateEnemies(delta); }
+  if (window.checkEnemyHits) { window.checkEnemyHits(); }
   renderer.render(scene, camera);
 }
 
@@ -58,6 +61,8 @@ function main() {
   initScene();
   initControls();
   initLoaders();
+  // Spawn more enemies on the map.
+  if (window.spawnEnemies) { window.spawnEnemies(10); }
   animate();
 }
 

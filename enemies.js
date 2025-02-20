@@ -19,82 +19,136 @@ class Enemy {
 
   loadModel() {
     const loader = new THREE.FBXLoader();
-    // Load the enemy's idle model as the base.
+
+    // 1) Load the enemy's idle model as the base.
     loader.load(
-      "https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/MonsterIdle-Dance.fbx",
+      // Make sure this URL is correct for your repo/file path:
+      "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/MonsterIdle-Dance.fbx",
       (object) => {
+        console.log("[Enemy] Idle model loaded OK.");
         this.model = object;
         this.model.scale.set(0.01, 0.01, 0.01);
         this.model.position.copy(this.position);
         scene.add(this.model);
+
         this.mixer = new THREE.AnimationMixer(this.model);
+
         // Use the idle animation from the loaded model.
         if (object.animations && object.animations.length > 0) {
           this.actions.idle = this.mixer.clipAction(object.animations[0]);
-          this.actions.idle.play();
+          this.actions.idle.play(); // Start in idle
+        } else {
+          console.warn("[Enemy] No idle animation found in idle FBX.");
         }
+
+        // Now load the other animations.
         this.loadAnimations();
+      },
+      (xhr) => {
+        // Progress logging for the idle model.
+        console.log(
+          `Idle model: ${(xhr.loaded / xhr.total * 100).toFixed(3)}% loaded`
+        );
+      },
+      (error) => {
+        console.error("[Enemy] Error loading idle model:", error);
       }
     );
   }
 
   loadAnimations() {
     const loader = new THREE.FBXLoader();
-    // Running animation.
+
+    // 2) Running animation
     loader.load(
-      "https://github.com/NoLimitNexus/Utilities/raw/refs/heads/main/MonsterRunning.fbx",
+      // Updated link to raw.githubusercontent.com
+      "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/MonsterRunning.fbx",
       (object) => {
+        console.log("[Enemy] Running model loaded successfully.");
         if (object.animations && object.animations.length > 0) {
           let runClip = object.animations[0];
-          runClip.tracks.forEach(track => {
-            if (track.name.startsWith('mixamorig:')) {
-              track.name = track.name.replace('mixamorig:', '');
+          console.log(
+            "[Enemy] Running animation tracks found:",
+            runClip.tracks.map((t) => t.name)
+          );
+          // Rename tracks if they start with 'mixamorig:'
+          runClip.tracks.forEach((track) => {
+            if (track.name.startsWith("mixamorig:")) {
+              track.name = track.name.replace("mixamorig:", "");
             }
           });
           this.actions.running = this.mixer.clipAction(runClip);
+        } else {
+          console.warn("[Enemy] No running animation found in MonsterRunning.fbx");
         }
+      },
+      null,
+      (error) => {
+        console.error("[Enemy] Error loading running animation:", error);
       }
     );
-    // Attack animation.
+
+    // 3) Attack animation
     loader.load(
-      "https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/MonsterPunching.fbx",
+      "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/MonsterPunching.fbx",
       (object) => {
+        console.log("[Enemy] Attack model loaded successfully.");
         if (object.animations && object.animations.length > 0) {
           let attackClip = object.animations[0];
-          attackClip.tracks.forEach(track => {
-            if (track.name.startsWith('mixamorig:')) {
-              track.name = track.name.replace('mixamorig:', '');
+          attackClip.tracks.forEach((track) => {
+            if (track.name.startsWith("mixamorig:")) {
+              track.name = track.name.replace("mixamorig:", "");
             }
           });
           this.actions.attack = this.mixer.clipAction(attackClip);
+        } else {
+          console.warn("[Enemy] No attack animation found in MonsterPunching.fbx");
         }
+      },
+      null,
+      (error) => {
+        console.error("[Enemy] Error loading attack animation:", error);
       }
     );
-    // Death animation.
+
+    // 4) Death animation
     loader.load(
-      "https://github.com/NoLimitNexus/Utilities/raw/refs/heads/main/Flying%20Back%20Death.fbx",
+      "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/Flying%20Back%20Death.fbx",
       (object) => {
+        console.log("[Enemy] Death model loaded successfully.");
         if (object.animations && object.animations.length > 0) {
           let deathClip = object.animations[0];
-          deathClip.tracks.forEach(track => {
-            if (track.name.startsWith('mixamorig:')) {
-              track.name = track.name.replace('mixamorig:', '');
+          deathClip.tracks.forEach((track) => {
+            if (track.name.startsWith("mixamorig:")) {
+              track.name = track.name.replace("mixamorig:", "");
             }
           });
           this.actions.death = this.mixer.clipAction(deathClip);
+        } else {
+          console.warn("[Enemy] No death animation found in Flying Back Death.fbx");
         }
+      },
+      null,
+      (error) => {
+        console.error("[Enemy] Error loading death animation:", error);
       }
     );
   }
 
   update(delta, playerPosition) {
+    // If the model isn't loaded yet, skip.
     if (!this.model) return;
 
-    // Compute distance to player.
+    // If there's no valid player position, skip to avoid errors.
+    if (!playerPosition) return;
+
+    // Compute distance to the player.
     const distance = this.model.position.distanceTo(playerPosition);
 
+    // If enemy is already "dead," skip all logic.
     if (this.state === "dead") return;
 
+    // If enemy is in "dying" state, wait for the death animation to finish.
     if (this.state === "dying") {
       if (
         this.actions.death &&
@@ -103,51 +157,85 @@ class Enemy {
         this.state = "dead";
         scene.remove(this.model);
       }
-    } else if (distance < 20) {
+      if (this.mixer) this.mixer.update(delta);
+      return;
+    }
+
+    // If the player is within the 40-unit aggro range:
+    if (distance < 40) {
+      // If the player is more than 2 units away, chase (run).
       if (distance > 2) {
-        // If the player is within 20 units but not too close, run toward the player.
+        // Switch to running if not already running.
         if (this.state !== "running") {
+          console.log(`[Enemy] Switching to RUN (dist=${distance.toFixed(2)})`);
           this.switchAction("running", 0.2);
           this.state = "running";
         }
-        const direction = new THREE.Vector3()
-          .subVectors(playerPosition, this.model.position)
-          .normalize();
+        // Rotate to face the player, then move forward.
+        const direction = new THREE.Vector3().subVectors(playerPosition, this.model.position);
+        const angle = Math.atan2(direction.x, direction.z);
+        this.model.rotation.y = angle;
+        direction.normalize();
+        // Move enemy toward the player
         this.model.position.add(direction.multiplyScalar(5 * delta));
-      } else {
-        // When very close, attack.
+      }
+      // If within 2 units, attack.
+      else {
         if (this.state !== "attacking") {
+          console.log(`[Enemy] Switching to ATTACK (dist=${distance.toFixed(2)})`);
           this.switchAction("attack", 0.2);
           this.state = "attacking";
-          // (Attack effects or damage to the player would be triggered here.)
+        } else {
+          // Continue punching; if the animation finishes, reset it.
+          if (
+            this.actions.attack &&
+            this.actions.attack.time >= this.actions.attack.getClip().duration - 0.1
+          ) {
+            this.actions.attack.reset().play();
+          }
         }
       }
-    } else {
-      // Otherwise, remain idle.
+    }
+    // If the player is outside the 40-unit aggro radius, idle.
+    else {
       if (this.state !== "idle") {
+        console.log(`[Enemy] Switching to IDLE (dist=${distance.toFixed(2)})`);
         this.switchAction("idle", 0.2);
         this.state = "idle";
       }
     }
 
-    if (this.mixer) this.mixer.update(delta);
+    // Finally, update the mixer each frame.
+    if (this.mixer) {
+      this.mixer.update(delta);
+    }
   }
 
   switchAction(actionName, fadeDuration) {
-    if (this.actions[actionName] && this.mixer) {
-      const newAction = this.actions[actionName];
-      newAction.reset().play();
-      for (const key in this.actions) {
-        if (key !== actionName && this.actions[key] && this.actions[key].isRunning()) {
-          this.actions[key].crossFadeTo(newAction, fadeDuration, false);
-        }
+    // If the desired animation is actually loaded, cross-fade to it.
+    const newAction = this.actions[actionName];
+    if (!newAction) {
+      console.warn(`[Enemy] No ${actionName} action found; cannot switch animation.`);
+      return;
+    }
+    // Force it to be fully active in case weight/timeScale are off
+    newAction.enabled = true;
+    newAction.setEffectiveTimeScale(1.0);
+    newAction.setEffectiveWeight(1.0);
+
+    newAction.reset().play();
+    for (const key in this.actions) {
+      if (key !== actionName && this.actions[key] && this.actions[key].isRunning()) {
+        this.actions[key].crossFadeTo(newAction, fadeDuration, false);
       }
     }
   }
 
   takeHit() {
     this.health--;
+    console.log("[Enemy] Took a hit; health =", this.health);
     if (this.health <= 0 && this.state !== "dying" && this.state !== "dead") {
+      console.log("[Enemy] Switching to DEATH.");
       this.switchAction("death", 0.2);
       this.state = "dying";
     }
@@ -155,10 +243,11 @@ class Enemy {
 }
 
 // Utility function to spawn a given number of enemies.
-window.spawnEnemies = function(count) {
+window.spawnEnemies = function(count = 10) {
   window.enemies = window.enemies || [];
   for (let i = 0; i < count; i++) {
     let pos;
+    // Keep enemies out of a 50-unit radius around (0, -1, 0)
     do {
       pos = new THREE.Vector3(
         THREE.MathUtils.randFloatSpread(500),
@@ -166,6 +255,7 @@ window.spawnEnemies = function(count) {
         THREE.MathUtils.randFloatSpread(500)
       );
     } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
+
     const enemy = new Enemy(pos);
     window.enemies.push(enemy);
   }
@@ -173,9 +263,11 @@ window.spawnEnemies = function(count) {
 
 // Update all enemies each frame.
 window.updateEnemies = function(delta) {
-  if (!window.enemies) return;
+  if (!window.enemies || !window.player) return;
+  // Pass in the player's position
+  const playerPos = window.player.position.clone();
   window.enemies.forEach((enemy) => {
-    enemy.update(delta, window.player.position);
+    enemy.update(delta, playerPos);
   });
 };
 
