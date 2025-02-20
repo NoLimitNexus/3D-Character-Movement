@@ -6,10 +6,11 @@
 
 // ----- Global movement & camera-related variables -----
 window.keys = {
-    w: false, s: false,         // Forward/backward keys
-    up: false, down: false,       // Arrow keys for forward/backward
-    // A and D (and left/right arrows) are now used for turning.
-    left: false, right: false,    // Arrow keys for turning
+    w: false, s: false,         
+    a: false, d: false,
+    up: false, down: false,
+    left: false, right: false, 
+    q: false, e: false,
     shift: false
 };
 
@@ -17,46 +18,46 @@ window.isLeftMouseDown = false;
 window.isRightMouseDown = false;
 window.previousMousePosition = { x: 0, y: 0 };
 
-// Camera orbit and zoom
-window.manualYawOffset = 0;   // This changes with mouse drag or turning keys
-window.autoYaw = 0;           // Auto adjusts if you move forward/backward
-window.cameraPitch = 0.3;     // Angle for the camera up/down
-window.cameraDistance = 10;   // Distance from player
-const cameraHeight = 5;       // Base height offset
+// We have both autoYaw (for Q/E turning) and manualYawOffset (for mouse drag).
+window.autoYaw = 0;
+window.manualYawOffset = 0;
+window.cameraPitch = 0.3;
+window.cameraDistance = 10;
+const cameraHeight = 5;
 
-// Increased base movement speed
-const moveSpeed = 8; // increased base movement speed
+// Movement speed
+const moveSpeed = 8;
 
 /**
  * Set up all the event listeners for mouse/keyboard input.
- * We call this from main.js::main().
  */
 function initControls() {
   if (!window.renderer) return;
 
   // Mouse Events
   renderer.domElement.addEventListener('mousedown', (event) => {
-    if (event.button === 2) { // Right mouse button
+    if (event.button === 2) {
+      // Right mouse button => rotate camera
       isRightMouseDown = true;
       previousMousePosition.x = event.clientX;
       previousMousePosition.y = event.clientY;
-    } else if (event.button === 0) { // Left mouse button
+    } else if (event.button === 0) {
+      // Left mouse button => (optional use)
       isLeftMouseDown = true;
     }
   });
 
   renderer.domElement.addEventListener('mousemove', (event) => {
     if (isRightMouseDown) {
-      let deltaMove = {
+      const deltaMove = {
         x: event.clientX - previousMousePosition.x,
         y: event.clientY - previousMousePosition.y
       };
       const sensitivity = 0.005;
-      // Update manual yaw offset without affecting autoYaw
+      // Adjust manual yaw offset with horizontal mouse movement
       manualYawOffset -= deltaMove.x * sensitivity;
-      // Invert vertical movement for pitch
+      // Adjust camera pitch with vertical mouse movement
       cameraPitch += deltaMove.y * sensitivity;
-      // Clamp pitch
       cameraPitch = Math.max(-0.5, Math.min(0.8, cameraPitch));
       previousMousePosition.x = event.clientX;
       previousMousePosition.y = event.clientY;
@@ -86,21 +87,22 @@ function initControls() {
   document.addEventListener('keydown', (event) => {
     switch(event.code) {
       case 'KeyW': keys.w = true; break;
-      case 'KeyA': keys.a = true; break; // Now used for turning left
+      case 'KeyA': keys.a = true; break;
       case 'KeyS': keys.s = true; break;
-      case 'KeyD': keys.d = true; break; // Now used for turning right
+      case 'KeyD': keys.d = true; break;
       case 'ArrowUp': keys.up = true; break;
       case 'ArrowDown': keys.down = true; break;
       case 'ArrowLeft': keys.left = true; break;
       case 'ArrowRight': keys.right = true; break;
+      // Q/E => turn left/right
+      case 'KeyQ': keys.q = true; break;
+      case 'KeyE': keys.e = true; break;
       case 'ShiftLeft':
       case 'ShiftRight': keys.shift = true; break;
       case 'Space':
-        // Start jump (defined in animations.js)
         startJump();
         break;
       case 'KeyF':
-        // Start spell cast (defined in animations.js)
         startSpellCast();
         break;
     }
@@ -116,6 +118,8 @@ function initControls() {
       case 'ArrowDown': keys.down = false; break;
       case 'ArrowLeft': keys.left = false; break;
       case 'ArrowRight': keys.right = false; break;
+      case 'KeyQ': keys.q = false; break;
+      case 'KeyE': keys.e = false; break;
       case 'ShiftLeft':
       case 'ShiftRight': keys.shift = false; break;
     }
@@ -130,58 +134,46 @@ function updatePlayerAndCamera(delta) {
   if (!window.player) return;
 
   const turnSpeed = 2.0;
-  
-  // Use A (or left arrow) to turn left and D (or right arrow) to turn right.
-  // Reversed from before so that A now turns left and D turns right.
-  if (keys.a || keys.left) {
-    manualYawOffset += turnSpeed * delta;
+
+  // Q/E => autoYaw
+  if (keys.q) {
+    window.autoYaw += turnSpeed * delta;
   }
-  if (keys.d || keys.right) {
-    manualYawOffset -= turnSpeed * delta;
+  if (keys.e) {
+    window.autoYaw -= turnSpeed * delta;
   }
 
-  let finalYaw = autoYaw + manualYawOffset;
+  // finalYaw is sum of autoYaw and manualYawOffset
+  const finalYaw = window.autoYaw + manualYawOffset;
 
-  // Calculate forward vector based on finalYaw
+  // Forward vector from finalYaw
   const forwardVec = new THREE.Vector3(Math.sin(finalYaw), 0, Math.cos(finalYaw));
+  // Right vector
+  const rightVec = new THREE.Vector3().crossVectors(forwardVec, new THREE.Vector3(0, 1, 0)).normalize();
 
-  // Build movement vector only from forward/backward input
+  // Build movement vector
   let movement = new THREE.Vector3();
   if (keys.w || keys.up)    movement.add(forwardVec);
   if (keys.s || keys.down)  movement.sub(forwardVec);
+  if (keys.a || keys.left)  movement.sub(rightVec);
+  if (keys.d || keys.right) movement.add(rightVec);
 
   // If both mouse buttons are down, also move forward
   if (isLeftMouseDown && isRightMouseDown) {
     movement.add(forwardVec);
   }
 
-  // Auto yaw adjustment if moving forward/backward and minimal manual turn input
-  if (Math.abs(manualYawOffset) < 0.001 && movement.length() > 0) {
-    movement.normalize();
-    let targetYaw = Math.atan2(movement.x, movement.z);
-    let yawDiff = targetYaw - autoYaw;
-    yawDiff = (yawDiff + Math.PI) % (2 * Math.PI) - Math.PI;
-    const autoTurnSpeed = 4.0;
-    let maxTurn = autoTurnSpeed * delta;
-    if (Math.abs(yawDiff) < maxTurn) {
-      autoYaw = targetYaw;
-    } else {
-      autoYaw += Math.sign(yawDiff) * maxTurn;
-    }
-    finalYaw = autoYaw;
-  }
-
-  // Apply rotation to the player
-  player.rotation.y = finalYaw;
-
-  // Move player forward/backward; increased sprint multiplier when shift is pressed.
+  // Normalize & move
   if (movement.length() > 0) {
     movement.normalize();
     const speed = keys.shift ? moveSpeed * 2.2 : moveSpeed;
     player.position.add(movement.multiplyScalar(speed * delta));
   }
 
-  // Position the camera behind the player
+  // Apply finalYaw to player
+  player.rotation.y = finalYaw;
+
+  // Position camera behind the player
   const offsetX = Math.sin(finalYaw) * cameraDistance * Math.cos(cameraPitch);
   const offsetZ = Math.cos(finalYaw) * cameraDistance * Math.cos(cameraPitch);
   const offsetY = cameraHeight + cameraDistance * Math.sin(cameraPitch);
@@ -192,10 +184,20 @@ function updatePlayerAndCamera(delta) {
   );
   camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
 
-  // Handle finishing jump/spell animations (from animations.js)
+  // Animation states
   updateAnimationStates(delta, movement);
 
-  // Check for log collisions and remove collected logs
+  // Spell projectiles
+  if (window.updateSpellProjectiles) {
+    window.updateSpellProjectiles(delta);
+  }
+
+  // Logs from trees
+  if (window.updateFlyingLogs) {
+    window.updateFlyingLogs(delta);
+  }
+
+  // Interactions
   if (window.checkLogCollisions) {
     window.checkLogCollisions(player);
   }

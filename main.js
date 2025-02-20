@@ -12,11 +12,12 @@ window.clock = null;
 window.player = null;
 
 // Store references to animation actions
-// (the actual action objects get set in animations.js and loader.js).
 window.idleAction = null;
 window.runAction = null;
 window.jumpAction = null;
 window.spellAction = null;
+window.leftStrafeAction = null;
+window.rightStrafeAction = null;
 window.activeAction = null;
 
 // Create the scene, camera, renderer, and lights
