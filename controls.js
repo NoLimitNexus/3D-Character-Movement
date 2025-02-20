@@ -138,12 +138,14 @@ window.keys = {
     // If there's movement input, update the character's facing relative to the anchored camera angle.
     if (inputVector.length() > 0) {
       inputVector.normalize();
-      // Calculate the relative angle from input.
-      // Inverting the result so that right input gives a negative offset.
       const relativeAngle = -Math.atan2(inputVector.x, -inputVector.y);
-      // The desired character angle is the anchored camera angle plus the relative input.
       const desiredAngle = window.cameraFixedAngle + relativeAngle;
-      window.characterYaw = desiredAngle;
+      // Use a faster smoothing factor when jumping
+      const turnSmoothing = window.isJumping ? 20 : 10;
+      const smoothing = turnSmoothing * delta;
+      let angleDiff = desiredAngle - window.characterYaw;
+      angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)); // normalize difference to [-PI, PI]
+      window.characterYaw += angleDiff * smoothing;
   
       // Move the character in its facing direction.
       const moveDir = new THREE.Vector3(Math.sin(window.characterYaw), 0, Math.cos(window.characterYaw));
@@ -174,4 +176,3 @@ window.keys = {
     if (window.updateFlyingLogs) { window.updateFlyingLogs(delta); }
     if (window.checkLogCollisions) { window.checkLogCollisions(player); }
   }
-  

@@ -386,4 +386,3 @@
     // Wait a moment, then spawn an example drone
     setTimeout(spawnDroneExample, 5000);
   }
-  

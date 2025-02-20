@@ -14,6 +14,9 @@ window.isSpellCasting = false;
 window.castSwitchTriggered = false;
 window.activeAction = null;
 
+// Added for double jump support.
+window.jumpCount = 0;
+
 // Spell #1 projectiles
 window.activeProjectiles = [];
 
@@ -38,12 +41,16 @@ window.switchAction = function(newAction, fadeDuration = 0) {
   window.activeAction = newAction;
 };
 
-/** Called when the user presses SPACE. */
+/** Called when the user presses SPACE.
+ *  Modified to allow a double jump.
+ */
 window.startJump = function() {
-  if (!isJumping && window.jumpAction) {
-    isJumping = true;
+  window.jumpCount = window.jumpCount || 0;
+  if (window.jumpAction && window.jumpCount < 2) {
     jumpSwitchTriggered = false;
     switchAction(window.jumpAction, 0);
+    window.jumpCount++;
+    isJumping = true;
   }
 };
 
@@ -410,12 +417,13 @@ window.updateFlyingSmallRocks = function(delta) {
 //////////////////////
 
 window.updateAnimationStates = function(delta, movement) {
-  // Jump finishing
+  // Jump finishing and double jump reset.
   if (isJumping && activeAction === jumpAction && jumpAction.getClip()) {
     const jumpDuration = jumpAction.getClip().duration;
     if (!jumpSwitchTriggered && jumpAction.time >= jumpDuration - 0.1) {
       jumpSwitchTriggered = true;
       isJumping = false;
+      window.jumpCount = 0; // reset jump counter after jump completes
       switchAction((movement.length() > 0 ? runAction : idleAction), 0.1);
     }
   }
