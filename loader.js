@@ -35,11 +35,14 @@
   let tipInterval = null;
   function updateProgress() {
     let progress = (resourcesLoaded / resourcesToLoad) * 100;
-    const bar = document.getElementById('progressBar');
-    bar.style.width = progress + '%';
+    // Update global loading progress for the loading animation
+    window.loadingProgress = progress;
     if (resourcesLoaded === resourcesToLoad) {
       if (tipInterval) { clearInterval(tipInterval); }
-      document.getElementById('loadingContainer').style.display = 'none';
+      // Hide the loading container after a short delay
+      setTimeout(function() {
+        document.getElementById('loadingContainer').style.display = 'none';
+      }, 500);
     }
   }
   window.resourceLoaded = function() {
@@ -331,7 +334,7 @@
       function (gltf) {
         window.smallRockModel = gltf.scene;
         // Increase scale from 0.025 to 0.04.
-        window.smallRockModel.scale.set(0.04, 0.04, 0.04);
+        window.smallRockModel.scale.set(0.24, 0.24, 0.24);
         resourceLoaded();
       },
       function (xhr) {
@@ -385,4 +388,3 @@
     loadBigRocks();
     loadSmallRockModel();
   }
-  

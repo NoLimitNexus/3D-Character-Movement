@@ -3,77 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>FBX Model with 3rd Person Controls, Running, Jump & Grass Plane</title>
+  <title>Fancy Loading + Game</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000; /* black background */
+    }
+    /* If you still need a Three.js canvas, it will be appended by main.js */
     canvas { display: block; }
-
-    /* Dark loading screen with smooth green progress bar */
-    #loadingContainer {
-      position: fixed;
-      top: 0; 
-      left: 0;
-      width: 100%; 
-      height: 100%;
-      background-color: #000; /* dark background */
-      display: flex; 
-      justify-content: center; 
-      align-items: center;
-      z-index: 9999;
-      flex-direction: column;
-      font-family: sans-serif;
-      color: #fff;
-    }
-    #progressBarContainer {
-      width: 300px;
-      height: 20px;
-      background-color: #333;
-      margin-top: 10px;
-    }
-    #progressBar {
-      width: 0%;
-      height: 100%;
-      background: repeating-linear-gradient(90deg, #00ff00, #00ff00 20px, #006600 20px, #006600 40px);
-      transition: width 0.3s ease;
-      box-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
-      animation: flow 2s linear infinite;
-    }
-    @keyframes flow {
-      0% {
-        background-position: 0 0;
-      }
-      100% {
-        background-position: 40px 0;
-      }
-    }
   </style>
 </head>
 <body>
-  <!-- Loading Screen -->
-  <div id="loadingContainer">
-    <div>Loading...</div>
-    <div id="progressBarContainer">
-      <div id="progressBar"></div>
-    </div>
-    <div id="loadingTip" style="margin-top:10px;"></div>
-  </div>
-
-  <!-- The renderer will inject its canvas here -->
-  
   <!-- External libraries -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://unpkg.com/fflate@0.7.1/umd/index.js"></script>
   <script src="https://unpkg.com/three@0.134.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.134.0/examples/js/loaders/FBXLoader.js"></script>
   <script src="https://unpkg.com/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://unpkg.com/three@0.134.0/examples/js/utils/SkeletonUtils.js"></script>
 
-  <!-- Our own files -->
+  <!-- Your own scripts -->
   <script src="./utils.js"></script>
   <script src="./controls.js"></script>
   <script src="./animations.js"></script>
   <script src="./interactions.js"></script>
   <script src="./inventory.js"></script>
   <script src="./loader.js"></script>
+  
+  <!-- The new loading animation (injects the 'G N I D A O L' spinner) -->
+  <script src="./loadingAnimation.js"></script>
+  
+  <!-- Finally, your main logic -->
   <script src="./main.js"></script>
 </body>
 </html>
