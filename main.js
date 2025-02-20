@@ -23,30 +23,47 @@ function initScene() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
+
   const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
   scene.add(ambientLight);
+
   const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
   directionalLight.position.set(5, 10, 7.5);
   scene.add(directionalLight);
+
   const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
   hemiLight.position.set(0, 200, 0);
   scene.add(hemiLight);
+
   const pointLight = new THREE.PointLight(0xffffff, 0.8);
   pointLight.position.set(0, 10, 0);
   scene.add(pointLight);
+
   clock = new THREE.Clock();
 }
 
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
-  if (mixer) { mixer.update(delta); }
+
+  if (mixer) {
+    mixer.update(delta);
+  }
   updatePlayerAndCamera(delta);
+
   // Also update small rocks spawned from big rocks.
-  if (window.updateFlyingSmallRocks) { window.updateFlyingSmallRocks(delta); }
+  if (window.updateFlyingSmallRocks) {
+    window.updateFlyingSmallRocks(delta);
+  }
+
   // Update enemies and check enemy hits.
-  if (window.updateEnemies) { window.updateEnemies(delta); }
-  if (window.checkEnemyHits) { window.checkEnemyHits(); }
+  if (window.updateEnemies) {
+    window.updateEnemies(delta);
+  }
+  if (window.checkEnemyHits) {
+    window.checkEnemyHits();
+  }
+
   renderer.render(scene, camera);
 }
 
@@ -61,8 +78,10 @@ function main() {
   initScene();
   initControls();
   initLoaders();
-  // Spawn more enemies on the map.
-  if (window.spawnEnemies) { window.spawnEnemies(10); }
+  // Spawn more enemies on the map (e.g., 30).
+  if (window.spawnEnemies) {
+    window.spawnEnemies(30);
+  }
   animate();
 }
 
