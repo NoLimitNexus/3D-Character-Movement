@@ -1,8 +1,7 @@
 //
 // animations.js
-// Handles jump/spell actions, the whispy projectile for Spell #1, and
-// tree collisions that spawn logs (same model as existing logs).
-// The spawned logs sit on the ground, then fly to the player and despawn.
+// Handles jump/spell actions, projectile updates, and
+// collisions that spawn logs from trees and small rocks from big rocks.
 //
 
 //////////////////////
@@ -18,8 +17,11 @@ window.activeAction = null;
 // Spell #1 projectiles
 window.activeProjectiles = [];
 
-// Logs that fly out of a tree
+// Logs that fly out of trees
 window.spawnedTreeLogs = [];
+
+// Small rocks that fly out of big rocks
+window.spawnedSmallRocks = [];
 
 
 //////////////////////
@@ -84,9 +86,9 @@ function createWhispyTail() {
 
 function spawnSpellProjectile() {
   if (!window.player || !window.scene) return;
-
   const projectileGroup = new THREE.Group();
 
+  // Glowing sphere
   const sphereGeo = new THREE.SphereGeometry(0.1, 16, 16);
   const sphereMat = new THREE.MeshBasicMaterial({
     color: 0x00ffff,
@@ -98,6 +100,7 @@ function spawnSpellProjectile() {
   const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
   projectileGroup.add(sphereMesh);
 
+  // Whispy tail
   const tailGroup = createWhispyTail();
   projectileGroup.add(tailGroup);
 
@@ -118,6 +121,7 @@ function spawnSpellProjectile() {
 
   window.scene.add(projectileGroup);
 
+  // Projectile data
   const speed = 25;
   const life = 2.5;
   const velocity = forward.clone().multiplyScalar(speed);
@@ -136,16 +140,17 @@ window.updateSpellProjectiles = function(delta) {
   for (let i = window.activeProjectiles.length - 1; i >= 0; i--) {
     const p = window.activeProjectiles[i];
 
-    // Move
+    // Move forward
     p.mesh.position.addScaledVector(p.velocity, delta);
 
-    // Tail swirl
+    // Whispy tail swirl
     p.tailGroup.children.forEach((planeMesh) => {
       planeMesh.rotation.z += planeMesh.userData.rotSpeed * delta * 2;
     });
 
-    // Collision with trees
+    // Collisions
     checkProjectileTreeCollision(p);
+    checkProjectileBigRockCollision(p);
 
     // Fade & remove
     p.life -= delta;
@@ -194,6 +199,7 @@ function checkProjectileTreeCollision(projectile) {
   }
 }
 
+/** Wobble the tree if wobbleTime > 0. Called each frame in updateAnimationStates(). */
 function updateTreeWobble(delta) {
   if (!window.trees) return;
   window.trees.forEach((treeObj) => {
@@ -216,19 +222,25 @@ function updateTreeWobble(delta) {
 // SPAWNING & UPDATING LOGS (FROM TREE)
 //////////////////////
 
+/**
+ * Spawns 'count' logs from the tree's position, using window.logModel.
+ * Each log flies out in an arc, lands, then eventually flies to the player.
+ */
 function spawnLogsFromTree(treeObj, count) {
   if (!window.scene || !window.logModel) return;
 
   for (let i = 0; i < count; i++) {
     const logClone = window.logModel.clone();
+    // Start near the tree's position
     const spawnPos = treeObj.position.clone();
-    spawnPos.y = -1 + 1.0;
+    spawnPos.y = -1 + 1.0; // about 1 unit above ground
     logClone.position.copy(spawnPos);
 
     window.scene.add(logClone);
 
+    // Random angle
     const angle = Math.random() * Math.PI * 2;
-    const speed = 5 + Math.random() * 4;
+    const speed = 5 + Math.random() * 4; 
     const vx = Math.cos(angle) * speed;
     const vz = Math.sin(angle) * speed;
     const vy = 6 + Math.random() * 2;
@@ -243,9 +255,12 @@ function spawnLogsFromTree(treeObj, count) {
   }
 }
 
+/**
+ * Update logs that flew out of trees:
+ * Gravity, land, then eventually fly to player.
+ */
 window.updateFlyingLogs = function(delta) {
   if (!window.spawnedTreeLogs || !window.player) return;
-
   const groundY = -1;
   for (let i = window.spawnedTreeLogs.length - 1; i >= 0; i--) {
     const logObj = window.spawnedTreeLogs[i];
@@ -255,14 +270,15 @@ window.updateFlyingLogs = function(delta) {
       continue;
     }
 
-    // If not yet flying to player:
     if (!logObj.isFlyingToPlayer) {
       if (!logObj.hasLanded) {
+        // Gravity
         logObj.velocity.y -= 9.8 * delta;
         m.position.addScaledVector(logObj.velocity, delta);
-
+        // Land check
         if (m.position.y < groundY) {
           m.position.y = groundY;
+          // bounce or land
           if (Math.abs(logObj.velocity.y) > 2.0) {
             logObj.velocity.y = -logObj.velocity.y * 0.5;
           } else {
@@ -271,13 +287,14 @@ window.updateFlyingLogs = function(delta) {
           }
         }
       } else {
+        // Landed => increment timer
         logObj.landTimer += delta;
         if (logObj.landTimer >= 5) {
           logObj.isFlyingToPlayer = true;
         }
       }
     } else {
-      // Flying to player
+      // Fly to player
       const distVec = window.player.position.clone().sub(m.position);
       const dist = distVec.length();
       if (dist < 0.5) {
@@ -294,12 +311,118 @@ window.updateFlyingLogs = function(delta) {
 
 
 //////////////////////
+// BIG ROCK COLLISION & WOBBLE
+//////////////////////
+
+function checkProjectileBigRockCollision(projectile) {
+  if (!window.bigRocks) return;
+
+  const projPos = projectile.mesh.position;
+  const projectileRadius = 0.1;
+  const rockRadius = 1.5; // approximate
+  const combined = projectileRadius + rockRadius;
+
+  for (let i = 0; i < window.bigRocks.length; i++) {
+    const rockObj = window.bigRocks[i];
+    const dist = projPos.distanceTo(rockObj.position);
+    if (dist < combined) {
+      // Collision
+      window.scene.remove(projectile.mesh);
+      const idx = window.activeProjectiles.indexOf(projectile);
+      if (idx > -1) {
+        window.activeProjectiles.splice(idx, 1);
+      }
+      rockObj.wobbleTime = 1.0;
+      spawnSmallRocksFromBigRock(rockObj, 2);
+      break;
+    }
+  }
+}
+
+function updateBigRockWobble(delta) {
+  if (!window.bigRocks) return;
+  window.bigRocks.forEach((rockObj) => {
+    if (rockObj.wobbleTime > 0) {
+      rockObj.wobbleTime -= delta;
+      const wobbleRatio = Math.max(rockObj.wobbleTime, 0);
+      const wobble = Math.sin((1 - wobbleRatio) * 20) * 0.05;
+      rockObj.mesh.rotation.x = wobble;
+      rockObj.mesh.rotation.z = wobble;
+      if (rockObj.wobbleTime <= 0) {
+        rockObj.mesh.rotation.x = 0;
+        rockObj.mesh.rotation.z = 0;
+      }
+    }
+  });
+}
+
+
+//////////////////////
+// SPAWNING & UPDATING SMALL ROCKS (FROM BIG ROCK)
+//////////////////////
+
+/**
+ * Already defined in loader.js:
+ * function spawnSmallRocksFromBigRock(rockObj, count) { ... }
+ * 
+ * We just update them here each frame.
+ */
+window.updateFlyingSmallRocks = function(delta) {
+  if (!window.spawnedSmallRocks || !window.player) return;
+
+  const groundY = -1;
+  for (let i = window.spawnedSmallRocks.length - 1; i >= 0; i--) {
+    const rockObj = window.spawnedSmallRocks[i];
+    const m = rockObj.mesh;
+    if (!m) {
+      window.spawnedSmallRocks.splice(i, 1);
+      continue;
+    }
+
+    if (!rockObj.isFlyingToPlayer) {
+      if (!rockObj.hasLanded) {
+        rockObj.velocity.y -= 9.8 * delta;
+        m.position.addScaledVector(rockObj.velocity, delta);
+
+        if (m.position.y < groundY) {
+          m.position.y = groundY;
+          if (Math.abs(rockObj.velocity.y) > 2.0) {
+            rockObj.velocity.y = -rockObj.velocity.y * 0.5;
+          } else {
+            rockObj.hasLanded = true;
+            rockObj.velocity.set(0, 0, 0);
+          }
+        }
+      } else {
+        rockObj.landTimer += delta;
+        if (rockObj.landTimer >= 5) {
+          rockObj.isFlyingToPlayer = true;
+        }
+      }
+    } else {
+      // Fly to player
+      const distVec = window.player.position.clone().sub(m.position);
+      const dist = distVec.length();
+      if (dist < 0.5) {
+        window.scene.remove(m);
+        window.spawnedSmallRocks.splice(i, 1);
+        continue;
+      }
+      distVec.normalize();
+      const flySpeed = 10;
+      m.position.addScaledVector(distVec, flySpeed * delta);
+    }
+  }
+};
+
+
+//////////////////////
 // MAIN UPDATE
 //////////////////////
 
 /**
  * Called each frame in controls.js::updatePlayerAndCamera().
- * Checks if jump/spell animations are done, wobbles trees, etc.
+ * Checks if jump/spell animations are done, wobbles trees and rocks, etc.
  */
 window.updateAnimationStates = function(delta, movement) {
   // Jump finishing
@@ -335,6 +458,7 @@ window.updateAnimationStates = function(delta, movement) {
     }
   }
 
-  // Update any tree wobbles
+  // Wobble trees & big rocks
   updateTreeWobble(delta);
+  updateBigRockWobble(delta);
 };

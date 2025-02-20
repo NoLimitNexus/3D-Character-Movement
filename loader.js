@@ -5,24 +5,15 @@
 //
 
 //////////////////////////
-// Suppress Specific Warnings
+// Patch FBXLoader to Skip ShininessExponent
 //////////////////////////
 (function() {
-    const originalWarn = console.warn;
-    console.warn = function(...args) {
-      const msg = args[0] || '';
-      if (
-        typeof msg === 'string' &&
-        (
-          msg.includes('ShininessExponent map is not supported') ||
-          msg.includes('Vertex has more than 4 skinning weights assigned to vertex')
-        )
-      ) {
-        // Skip these specific warnings
-        return;
+    const originalParseMaterial = THREE.FBXLoader.prototype.parseMaterial;
+    THREE.FBXLoader.prototype.parseMaterial = function(materialNode) {
+      if (materialNode && materialNode.ShininessExponent) {
+        delete materialNode.ShininessExponent;
       }
-      // Otherwise, pass everything to the original console.warn
-      originalWarn.apply(console, args);
+      return originalParseMaterial.call(this, materialNode);
     };
   })();
   
@@ -36,36 +27,25 @@
   ];
   
   // For tracking loading progress:
-  // We have: environment(1), idle(2), run(3), jump(4), spell(5), tree(6), logs(7)
-  window.resourcesToLoad = 7;
+  // Originally: environment, idle, run, jump, spell, trees, logs = 7 resources.
+  // Now we add: big rocks and small rock model = 2 more → total 9.
+  window.resourcesToLoad = 9;
   window.resourcesLoaded = 0;
   
-  // Used for rotating tips
   let tipInterval = null;
-  
-  // Update the progress bar in index.html
   function updateProgress() {
     let progress = (resourcesLoaded / resourcesToLoad) * 100;
     const bar = document.getElementById('progressBar');
     bar.style.width = progress + '%';
-  
-    // If everything is loaded, hide the loading screen
     if (resourcesLoaded === resourcesToLoad) {
-      // Clear the tip interval
-      if (tipInterval) {
-        clearInterval(tipInterval);
-      }
+      if (tipInterval) { clearInterval(tipInterval); }
       document.getElementById('loadingContainer').style.display = 'none';
     }
   }
-  
-  // Call this whenever a single resource finishes loading
   window.resourceLoaded = function() {
     resourcesLoaded++;
     updateProgress();
   };
-  
-  // Picks a random tip from loadingTips and displays it
   function showRandomTip() {
     if (!loadingTips.length) return;
     const tipElement = document.getElementById('loadingTip');
@@ -88,7 +68,6 @@
     grassTexture.wrapS = THREE.RepeatWrapping;
     grassTexture.wrapT = THREE.RepeatWrapping;
     grassTexture.repeat.set(50, 50);
-  
     const planeMaterial = new THREE.MeshStandardMaterial({
       map: grassTexture,
       color: new THREE.Color(0x556b2f)
@@ -106,7 +85,6 @@
    */
   function loadPlayerAndAnimations() {
     const fbxLoader = new THREE.FBXLoader();
-  
     // 1) IDLE
     fbxLoader.load(
       'https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/Idle.fbx',
@@ -115,10 +93,7 @@
         player.scale.set(0.01, 0.01, 0.01);
         player.position.set(0, -1, 0);
         scene.add(player);
-  
         mixer = new THREE.AnimationMixer(player);
-  
-        // If the idle FBX has animations, set up idleAction
         if (object.animations && object.animations.length > 0) {
           idleAction = mixer.clipAction(object.animations[0]);
           idleAction.play();
@@ -127,8 +102,6 @@
           console.log('No idle animations found');
         }
         resourceLoaded();
-  
-        // After the idle is loaded, load the other animations in sequence
         loadRunAnimation(fbxLoader);
         loadJumpAnimation(fbxLoader);
         loadSpellAnimation(fbxLoader);
@@ -149,7 +122,6 @@
       function (runObject) {
         if (runObject.animations && runObject.animations.length > 0) {
           let runClip = runObject.animations[0];
-          // Fix track names if necessary
           runClip.tracks.forEach(track => {
             if (track.name.startsWith('mixamorig:')) {
               track.name = track.name.replace('mixamorig:', '');
@@ -230,26 +202,20 @@
   }
   
   /**
-   * Load the tree model and place many copies around.
-   * We also store each tree in a global array so the whispy projectile can collide with them.
+   * Loads the tree model and randomly places copies around.
    */
   function loadTrees() {
     const gltfLoader = new THREE.GLTFLoader();
-    // Create a global array to track all placed trees
     if (!window.trees) window.trees = [];
-  
     gltfLoader.load(
       'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Tree.glb',
       function (gltf) {
         const treeModel = gltf.scene;
         treeModel.scale.set(0.25, 0.25, 0.25);
-  
         const numTrees = 50;
         window.treePositions = [];
-  
         for (let i = 0; i < numTrees; i++) {
           let pos;
-          // Ensure not too close to player's start (0, -1, 0)
           do {
             pos = new THREE.Vector3(
               THREE.MathUtils.randFloatSpread(500),
@@ -257,18 +223,10 @@
               THREE.MathUtils.randFloatSpread(500)
             );
           } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
-  
           const treeClone = treeModel.clone();
           treeClone.position.copy(pos);
           scene.add(treeClone);
-  
-          // Store each tree's info so we can handle collisions & wobbles later
-          window.trees.push({
-            mesh: treeClone,
-            position: pos.clone(),
-            wobbleTime: 0
-          });
-  
+          window.trees.push({ mesh: treeClone, position: pos.clone(), wobbleTime: 0 });
           window.treePositions.push(pos.clone());
         }
         resourceLoaded();
@@ -278,27 +236,22 @@
       },
       function (error) {
         console.error('Error loading tree model:', error);
-        resourceLoaded(); // ensure we count this even if it fails
+        resourceLoaded();
       }
     );
   }
   
   /**
-   * Load the log model (scaled up to 0.032)
-   * - Place random logs near trees on the ground
-   * - Also used for logs that fly out of trees when hit by the new spell
+   * Loads the log model and places logs near trees.
    */
   function loadLogs() {
     const gltfLoader = new THREE.GLTFLoader();
     gltfLoader.load(
       'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/log.glb',
       function (gltf) {
-        // The single log model: scale it once here
         window.logModel = gltf.scene;
         window.logModel.scale.set(0.032, 0.032, 0.032);
-  
         window.logObjects = [];
-        // For each tree, place 1 to 3 logs near it
         window.treePositions.forEach((treePos) => {
           const logsPerTree = THREE.MathUtils.randInt(1, 3);
           for (let i = 0; i < logsPerTree; i++) {
@@ -314,7 +267,6 @@
             window.logObjects.push(logClone);
           }
         });
-  
         resourceLoaded();
       },
       function (xhr) {
@@ -327,16 +279,110 @@
   }
   
   /**
+   * Loads the big rock model and randomly places copies around.
+   * Big rocks behave like trees (wobble when hit) but are slightly smaller.
+   */
+  function loadBigRocks() {
+    const gltfLoader = new THREE.GLTFLoader();
+    if (!window.bigRocks) window.bigRocks = [];
+    gltfLoader.load(
+      'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Big%20Rock.glb',
+      function (gltf) {
+        const rockModel = gltf.scene;
+        // Scale slightly smaller than trees; trees are at 0.25, so use 0.20.
+        rockModel.scale.set(0.20, 0.20, 0.20);
+        const numRocks = 20;
+        window.bigRockPositions = [];
+        for (let i = 0; i < numRocks; i++) {
+          let pos;
+          do {
+            pos = new THREE.Vector3(
+              THREE.MathUtils.randFloatSpread(500),
+              -1,
+              THREE.MathUtils.randFloatSpread(500)
+            );
+          } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
+          const rockClone = rockModel.clone();
+          rockClone.position.copy(pos);
+          scene.add(rockClone);
+          window.bigRocks.push({ mesh: rockClone, position: pos.clone(), wobbleTime: 0 });
+          window.bigRockPositions.push(pos.clone());
+        }
+        resourceLoaded();
+      },
+      function (xhr) {
+        console.log('Big Rock model: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+      },
+      function (error) {
+        console.error('Error loading Big Rock model:', error);
+      }
+    );
+  }
+  
+  /**
+   * Loads the small rock model.
+   * Small rocks will be spawned from big rocks when hit and behave like logs.
+   * They are now scaled a bit larger (0.04) so they are more visible.
+   */
+  function loadSmallRockModel() {
+    const gltfLoader = new THREE.GLTFLoader();
+    gltfLoader.load(
+      'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Small%20Rock.glb',
+      function (gltf) {
+        window.smallRockModel = gltf.scene;
+        // Increase scale from 0.025 to 0.04.
+        window.smallRockModel.scale.set(0.04, 0.04, 0.04);
+        resourceLoaded();
+      },
+      function (xhr) {
+        console.log('Small Rock model: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+      },
+      function (error) {
+        console.error('Error loading Small Rock model:', error);
+      }
+    );
+  }
+  
+  /**
+   * Spawns a number of small rocks from a big rock.
+   * Similar to spawnLogsFromTree but uses smallRockModel.
+   */
+  function spawnSmallRocksFromBigRock(rockObj, count) {
+    if (!window.scene || !window.smallRockModel) return;
+    if (!window.spawnedSmallRocks) window.spawnedSmallRocks = [];
+    for (let i = 0; i < count; i++) {
+      const rockClone = window.smallRockModel.clone();
+      const spawnPos = rockObj.position.clone();
+      spawnPos.y = -1 + 1.0; // about 1 unit above ground
+      rockClone.position.copy(spawnPos);
+      scene.add(rockClone);
+      // Random horizontal angle and speed
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 5 + Math.random() * 4;
+      const vx = Math.cos(angle) * speed;
+      const vz = Math.sin(angle) * speed;
+      const vy = 6 + Math.random() * 2;
+      window.spawnedSmallRocks.push({
+        mesh: rockClone,
+        velocity: new THREE.Vector3(vx, vy, vz),
+        isFlyingToPlayer: false,
+        hasLanded: false,
+        landTimer: 0
+      });
+    }
+  }
+  
+  /**
    * Main entry for loading. Called from main.js::main().
    */
   function initLoaders() {
-    // Start rotating tips while loading
     tipInterval = setInterval(showRandomTip, 3000);
-    showRandomTip(); // Show one immediately, then rotate every 3s
-  
+    showRandomTip();
     loadEnvironment();
     loadPlayerAndAnimations();
     loadTrees();
     loadLogs();
+    loadBigRocks();
+    loadSmallRockModel();
   }
   
