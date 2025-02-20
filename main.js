@@ -16,8 +16,7 @@ window.idleAction = null;
 window.runAction = null;
 window.jumpAction = null;
 window.spellAction = null;
-window.leftStrafeAction = null;
-window.rightStrafeAction = null;
+// (Strafe actions removed)
 window.activeAction = null;
 
 // Create the scene, camera, renderer, and lights

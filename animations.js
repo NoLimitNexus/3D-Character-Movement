@@ -60,13 +60,9 @@ window.startSpellCast = function() {
 // WHISPY PROJECTILE (HALF SIZE)
 //////////////////////
 
-/**
- * Create a whispy tail: multiple small planes swirling behind the sphere,
- * but half the size of the previous example (0.3 x 1.0 planes).
- */
 function createWhispyTail() {
   const tailGroup = new THREE.Group();
-  const planeCount = 6; // how many swirling planes
+  const planeCount = 6;
   for (let i = 0; i < planeCount; i++) {
     const planeGeo = new THREE.PlaneGeometry(0.3, 1.0);
     const planeMat = new THREE.MeshBasicMaterial({
@@ -78,27 +74,19 @@ function createWhispyTail() {
       blending: THREE.AdditiveBlending
     });
     const planeMesh = new THREE.Mesh(planeGeo, planeMat);
-
-    // Random rotation & offset
     planeMesh.position.z = -0.5;
     planeMesh.rotation.z = Math.random() * Math.PI * 2;
-    planeMesh.userData.rotSpeed = (Math.random() - 0.5) * 2; 
+    planeMesh.userData.rotSpeed = (Math.random() - 0.5) * 2;
     tailGroup.add(planeMesh);
   }
   return tailGroup;
 }
 
-/**
- * Spawns the projectile for Spell #1 at about 3/4 player height,
- * half the size of previous sphere (radius = 0.1 instead of 0.2).
- */
 function spawnSpellProjectile() {
   if (!window.player || !window.scene) return;
 
-  // Create group for sphere + tail
   const projectileGroup = new THREE.Group();
 
-  // Glowing sphere: radius = 0.1
   const sphereGeo = new THREE.SphereGeometry(0.1, 16, 16);
   const sphereMat = new THREE.MeshBasicMaterial({
     color: 0x00ffff,
@@ -110,7 +98,6 @@ function spawnSpellProjectile() {
   const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
   projectileGroup.add(sphereMesh);
 
-  // Whispy tail
   const tailGroup = createWhispyTail();
   projectileGroup.add(tailGroup);
 
@@ -127,14 +114,12 @@ function spawnSpellProjectile() {
     playerPos.y + 0.75,
     playerPos.z + forward.z * spawnOffsetForward
   );
-  // Orient forward
   projectileGroup.lookAt(projectileGroup.position.clone().add(forward));
 
   window.scene.add(projectileGroup);
 
-  // Projectile data
   const speed = 25;
-  const life = 2.5; // seconds
+  const life = 2.5;
   const velocity = forward.clone().multiplyScalar(speed);
 
   window.activeProjectiles.push({
@@ -147,13 +132,6 @@ function spawnSpellProjectile() {
   });
 }
 
-/**
- * Update all active Spell #1 projectiles each frame:
- *  - Move forward
- *  - Animate whispy tail
- *  - Check collisions with trees
- *  - Fade out over time
- */
 window.updateSpellProjectiles = function(delta) {
   for (let i = window.activeProjectiles.length - 1; i >= 0; i--) {
     const p = window.activeProjectiles[i];
@@ -161,12 +139,12 @@ window.updateSpellProjectiles = function(delta) {
     // Move
     p.mesh.position.addScaledVector(p.velocity, delta);
 
-    // Whispy tail swirl
+    // Tail swirl
     p.tailGroup.children.forEach((planeMesh) => {
       planeMesh.rotation.z += planeMesh.userData.rotSpeed * delta * 2;
     });
 
-    // Collision check with trees
+    // Collision with trees
     checkProjectileTreeCollision(p);
 
     // Fade & remove
@@ -201,14 +179,14 @@ function checkProjectileTreeCollision(projectile) {
     const treeObj = window.trees[i];
     const dist = projPos.distanceTo(treeObj.position);
     if (dist < combined) {
-      // Collision => remove projectile
+      // Collision
       window.scene.remove(projectile.mesh);
       const idx = window.activeProjectiles.indexOf(projectile);
       if (idx > -1) {
         window.activeProjectiles.splice(idx, 1);
       }
-      // Start wobble
-      treeObj.wobbleTime = 1.0; // 1 second
+      // Wobble
+      treeObj.wobbleTime = 1.0;
       // Spawn logs
       spawnLogsFromTree(treeObj, 2);
       break;
@@ -216,9 +194,6 @@ function checkProjectileTreeCollision(projectile) {
   }
 }
 
-/** 
- * Wobble the tree if wobbleTime > 0. Called each frame in updateAnimationStates().
- */
 function updateTreeWobble(delta) {
   if (!window.trees) return;
   window.trees.forEach((treeObj) => {
@@ -229,7 +204,6 @@ function updateTreeWobble(delta) {
       treeObj.mesh.rotation.x = wobble;
       treeObj.mesh.rotation.z = wobble;
       if (treeObj.wobbleTime <= 0) {
-        // done
         treeObj.mesh.rotation.x = 0;
         treeObj.mesh.rotation.z = 0;
       }
@@ -281,18 +255,15 @@ window.updateFlyingLogs = function(delta) {
       continue;
     }
 
-    // If it's not yet flying to player:
+    // If not yet flying to player:
     if (!logObj.isFlyingToPlayer) {
       if (!logObj.hasLanded) {
-        // Gravity
         logObj.velocity.y -= 9.8 * delta;
         m.position.addScaledVector(logObj.velocity, delta);
 
-        // Bounce or land
         if (m.position.y < groundY) {
           m.position.y = groundY;
           if (Math.abs(logObj.velocity.y) > 2.0) {
-            // bounce once
             logObj.velocity.y = -logObj.velocity.y * 0.5;
           } else {
             logObj.hasLanded = true;
@@ -300,7 +271,6 @@ window.updateFlyingLogs = function(delta) {
           }
         }
       } else {
-        // Already landed => increment landTimer
         logObj.landTimer += delta;
         if (logObj.landTimer >= 5) {
           logObj.isFlyingToPlayer = true;
@@ -311,7 +281,6 @@ window.updateFlyingLogs = function(delta) {
       const distVec = window.player.position.clone().sub(m.position);
       const dist = distVec.length();
       if (dist < 0.5) {
-        // Reached the player => remove
         window.scene.remove(m);
         window.spawnedTreeLogs.splice(i, 1);
         continue;
@@ -330,8 +299,7 @@ window.updateFlyingLogs = function(delta) {
 
 /**
  * Called each frame in controls.js::updatePlayerAndCamera().
- * Checks if jump/spell animations are done, spawns the projectile halfway,
- * wobbles trees, etc.
+ * Checks if jump/spell animations are done, wobbles trees, etc.
  */
 window.updateAnimationStates = function(delta, movement) {
   // Jump finishing
@@ -358,38 +326,12 @@ window.updateAnimationStates = function(delta, movement) {
     }
   }
 
-  // If not jumping or casting, choose run/strafe/idle
-  if (!isJumping && !isSpellCasting && runAction && idleAction && leftStrafeAction && rightStrafeAction) {
-    // Decompose movement into forward vs sideways
-    const playerForward = new THREE.Vector3(
-      Math.sin(window.player.rotation.y), 0, Math.cos(window.player.rotation.y)
-    ).normalize();
-    const rightVec = new THREE.Vector3().crossVectors(playerForward, new THREE.Vector3(0,1,0)).normalize();
-
-    const forwardComponent = movement.dot(playerForward);
-    const rightComponent = movement.dot(rightVec);
-
-    // If sideways dominates, use strafe
-    if (Math.abs(rightComponent) > Math.abs(forwardComponent) && Math.abs(rightComponent) > 0.1) {
-      if (rightComponent > 0) {
-        if (activeAction !== rightStrafeAction) {
-          switchAction(rightStrafeAction, 0.1);
-        }
-      } else {
-        if (activeAction !== leftStrafeAction) {
-          switchAction(leftStrafeAction, 0.1);
-        }
-      }
-    } else if (movement.length() > 0) {
-      // Running forward/back
-      if (activeAction !== runAction) {
-        switchAction(runAction, 0);
-      }
-    } else {
-      // Idle
-      if (activeAction !== idleAction) {
-        switchAction(idleAction, 0.1);
-      }
+  // If not jumping or casting, pick run or idle
+  if (!isJumping && !isSpellCasting && runAction && idleAction) {
+    if (movement.length() > 0 && activeAction !== runAction) {
+      switchAction(runAction, 0);
+    } else if (movement.length() === 0 && activeAction !== idleAction) {
+      switchAction(idleAction, 0.1);
     }
   }
 

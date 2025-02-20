@@ -36,8 +36,8 @@
   ];
   
   // For tracking loading progress:
-  // We have: environment(1), idle(2), run(3), jump(4), spell(5), left strafe(6), right strafe(7), tree(8), logs(9)
-  window.resourcesToLoad = 9;
+  // We have: environment(1), idle(2), run(3), jump(4), spell(5), tree(6), logs(7)
+  window.resourcesToLoad = 7;
   window.resourcesLoaded = 0;
   
   // Used for rotating tips
@@ -128,12 +128,10 @@
         }
         resourceLoaded();
   
-        // After idle is loaded, load the other animations in sequence
+        // After the idle is loaded, load the other animations in sequence
         loadRunAnimation(fbxLoader);
         loadJumpAnimation(fbxLoader);
         loadSpellAnimation(fbxLoader);
-        loadLeftStrafeAnimation(fbxLoader);
-        loadRightStrafeAnimation(fbxLoader);
       },
       function (xhr) {
         console.log('Idle model: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
@@ -227,69 +225,6 @@
       },
       function (error) {
         console.error('Error loading spell animation:', error);
-      }
-    );
-  }
-  
-  // 5) LEFT STRAFE
-  function loadLeftStrafeAnimation(fbxLoader) {
-    fbxLoader.load(
-      'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Left%20Strafe.fbx',
-      function (strafeObject) {
-        if (strafeObject.animations && strafeObject.animations.length > 0) {
-          let leftStrafeClip = strafeObject.animations[0];
-          leftStrafeClip.tracks.forEach(track => {
-            if (track.name.startsWith('mixamorig:')) {
-              track.name = track.name.replace('mixamorig:', '');
-            }
-          });
-          leftStrafeAction = mixer.clipAction(leftStrafeClip);
-          leftStrafeAction.setLoop(THREE.LoopRepeat);
-        } else {
-          console.log('No left strafe animation found');
-        }
-        resourceLoaded();
-      },
-      function (xhr) {
-        console.log('Left strafe animation: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
-      },
-      function (error) {
-        console.error('Error loading left strafe animation:', error);
-      }
-    );
-  }
-  
-  // 6) RIGHT STRAFE (flip the left strafe FBX)
-  function loadRightStrafeAnimation(fbxLoader) {
-    fbxLoader.load(
-      'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Left%20Strafe.fbx',
-      function (strafeObject) {
-        if (strafeObject.animations && strafeObject.animations.length > 0) {
-          let originalClip = strafeObject.animations[0];
-          let rightStrafeClip = originalClip.clone();
-          rightStrafeClip.tracks.forEach(track => {
-            if (track.name.startsWith('mixamorig:')) {
-              track.name = track.name.replace('mixamorig:', '');
-            }
-            // If this is a position track, flip X
-            if (track instanceof THREE.VectorKeyframeTrack && track.name.endsWith('.position')) {
-              for (let i = 0; i < track.values.length; i += 3) {
-                track.values[i] = -track.values[i]; // flip X component
-              }
-            }
-          });
-          rightStrafeAction = mixer.clipAction(rightStrafeClip);
-          rightStrafeAction.setLoop(THREE.LoopRepeat);
-        } else {
-          console.log('No left strafe animation found to flip for right strafe');
-        }
-        resourceLoaded();
-      },
-      function (xhr) {
-        console.log('Right strafe animation: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
-      },
-      function (error) {
-        console.error('Error loading right strafe animation:', error);
       }
     );
   }
