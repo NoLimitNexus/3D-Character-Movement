@@ -189,6 +189,8 @@
             }
           });
           spellAction = mixer.clipAction(spellClip);
+          // Set spell animation to play at 2x speed
+          spellAction.setEffectiveTimeScale(2.0);
           spellAction.setLoop(THREE.LoopOnce);
           spellAction.clampWhenFinished = false;
         } else {
@@ -228,10 +230,7 @@
     gltfLoader.load(
       'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Small%20Rock.glb',
       function(gltf) {
-        // This is the new DRONE model
         window.droneModel = gltf.scene;
-        // The original "small rock" was around 0.425 scale. 
-        // Now we scale it 10× smaller => 0.0425
         window.droneModel.scale.set(0.0425, 0.0425, 0.0425);
         resourceLoaded();
       },
@@ -265,7 +264,6 @@
             );
           } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
           const treeClone = treeModel.clone();
-          // Unique materials so that only the fallen tree fades
           treeClone.traverse(child => {
             if (child.isMesh && child.material) {
               child.material = child.material.clone();
