@@ -130,9 +130,9 @@ window.keys = {
   
     // Build a 2D input vector from WASD/arrow keys.
     let inputVector = new THREE.Vector2(0, 0);
-    if (keys.w || keys.up) inputVector.y -= 1;
-    if (keys.s || keys.down) inputVector.y += 1;
-    if (keys.a || keys.left) inputVector.x -= 1;
+    if (keys.w || keys.up)    inputVector.y -= 1;
+    if (keys.s || keys.down)  inputVector.y += 1;
+    if (keys.a || keys.left)  inputVector.x -= 1;
     if (keys.d || keys.right) inputVector.x += 1;
   
     // If there's movement input, update the character's facing relative to the anchored camera angle.
@@ -140,15 +140,36 @@ window.keys = {
       inputVector.normalize();
       const relativeAngle = -Math.atan2(inputVector.x, -inputVector.y);
       const desiredAngle = window.cameraFixedAngle + relativeAngle;
-      // Use a faster smoothing factor when jumping
+  
+      // We normally smooth turning, but if the user flips from forward to back or left to right,
+      // we skip smoothing and instantly face the new direction.
+      // Use a faster smoothing factor when jumping:
       const turnSmoothing = window.isJumping ? 20 : 10;
       const smoothing = turnSmoothing * delta;
+  
       let angleDiff = desiredAngle - window.characterYaw;
-      angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff)); // normalize difference to [-PI, PI]
-      window.characterYaw += angleDiff * smoothing;
+      // Normalize angleDiff to [-PI, PI]
+      angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
+  
+      // Detect direct 90° (±π/2) or 180° (±π) changes
+      const angleAbs = Math.abs(angleDiff);
+      const nearHalfPi = Math.abs(angleAbs - Math.PI * 0.5) < 0.01; // near ±90°
+      const nearPi = Math.abs(angleAbs - Math.PI) < 0.01;           // near ±180°
+  
+      if (nearHalfPi || nearPi) {
+        // No smoothing; snap instantly to the new direction
+        window.characterYaw = desiredAngle;
+      } else {
+        // Otherwise, continue smoothing
+        window.characterYaw += angleDiff * smoothing;
+      }
   
       // Move the character in its facing direction.
-      const moveDir = new THREE.Vector3(Math.sin(window.characterYaw), 0, Math.cos(window.characterYaw));
+      const moveDir = new THREE.Vector3(
+        Math.sin(window.characterYaw),
+        0,
+        Math.cos(window.characterYaw)
+      );
       const speed = keys.shift ? moveSpeed * 2.2 : moveSpeed;
       window.player.position.add(moveDir.multiplyScalar(speed * delta));
     }
@@ -164,15 +185,23 @@ window.keys = {
   
     // The camera always stays behind the character.
     camera.position.set(
-      player.position.x + window.cameraOffsetDir * offsetX,
-      player.position.y + offsetY,
-      player.position.z + window.cameraOffsetDir * offsetZ
+      window.player.position.x + window.cameraOffsetDir * offsetX,
+      window.player.position.y + offsetY,
+      window.player.position.z + window.cameraOffsetDir * offsetZ
     );
-    camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
+    camera.lookAt(
+      window.player.position.x,
+      window.player.position.y + 2,
+      window.player.position.z
+    );
   
     // Update animations, spells, logs, interactions, etc.
     updateAnimationStates(delta, inputVector);
     if (window.updateSpellProjectiles) { window.updateSpellProjectiles(delta); }
     if (window.updateFlyingLogs) { window.updateFlyingLogs(delta); }
-    if (window.checkLogCollisions) { window.checkLogCollisions(player); }
+    if (window.checkLogCollisions) { window.checkLogCollisions(window.player); }
   }
+  
+  window.initControls = initControls;
+  window.updatePlayerAndCamera = updatePlayerAndCamera;
+  
