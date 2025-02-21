@@ -19,39 +19,44 @@ class Enemy {
 
   loadModel() {
     const loader = new THREE.FBXLoader();
-    // Load the enemy's idle model as the base.
+    // Replace the idle animation with "Crouch Idle"
     loader.load(
-      "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/MonsterIdle-Dance.fbx",
+      "https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Crouch%20Idle.fbx",
       (object) => {
-        console.log("[Enemy] Idle model loaded OK.");
+        console.log("[Enemy] Idle (Crouch Idle) model loaded OK.");
         this.model = object;
-        // Make the orc half its original size (was 0.01, now 0.005)
+        // Use your preferred scale – here we keep it at 0.025
         this.model.scale.set(0.025, 0.025, 0.025);
         this.model.position.copy(this.position);
         scene.add(this.model);
 
         this.mixer = new THREE.AnimationMixer(this.model);
 
-        // Use the idle animation from the loaded model.
+        // Set the idle action using the new Crouch Idle FBX
         if (object.animations && object.animations.length > 0) {
           this.actions.idle = this.mixer.clipAction(object.animations[0]);
           this.actions.idle.play();
         } else {
-          console.warn("[Enemy] No idle animation found in idle FBX.");
+          console.warn("[Enemy] No idle animation found in Crouch Idle FBX.");
         }
 
         this.loadAnimations();
+      },
+      undefined,
+      (error) => {
+        console.error("[Enemy] Error loading idle model:", error);
       }
     );
   }
 
   loadAnimations() {
     const loader = new THREE.FBXLoader();
-    // Running animation.
+
+    // Replace the running animation with "monster scary run"
     loader.load(
-      "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/MonsterRunning.fbx",
+      "https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/monster%20scary%20run.fbx",
       (object) => {
-        console.log("[Enemy] Running model loaded successfully.");
+        console.log("[Enemy] Running (monster scary run) model loaded successfully.");
         if (object.animations && object.animations.length > 0) {
           let runClip = object.animations[0];
           runClip.tracks.forEach(track => {
@@ -61,11 +66,16 @@ class Enemy {
           });
           this.actions.running = this.mixer.clipAction(runClip);
         } else {
-          console.warn("[Enemy] No running animation found in MonsterRunning.fbx");
+          console.warn("[Enemy] No running animation found in monster scary run FBX");
         }
+      },
+      undefined,
+      (error) => {
+        console.error("[Enemy] Error loading running animation:", error);
       }
     );
-    // Attack animation.
+
+    // Attack animation (unchanged)
     loader.load(
       "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/MonsterPunching.fbx",
       (object) => {
@@ -81,9 +91,14 @@ class Enemy {
         } else {
           console.warn("[Enemy] No attack animation found in MonsterPunching.fbx");
         }
+      },
+      undefined,
+      (error) => {
+        console.error("[Enemy] Error loading attack animation:", error);
       }
     );
-    // Death animation.
+
+    // Death animation (unchanged)
     loader.load(
       "https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/Flying%20Back%20Death.fbx",
       (object) => {
@@ -99,35 +114,32 @@ class Enemy {
         } else {
           console.warn("[Enemy] No death animation found in Flying Back Death.fbx");
         }
+      },
+      undefined,
+      (error) => {
+        console.error("[Enemy] Error loading death animation:", error);
       }
     );
   }
 
   update(delta, playerPosition) {
     if (!this.model) return;
-
     const distance = this.model.position.distanceTo(playerPosition);
-
     if (this.state === "dead") return;
-
     if (this.state === "dying") {
-      if (
-        this.actions.death &&
-        this.actions.death.time >= this.actions.death.getClip().duration - 0.1
-      ) {
+      if (this.actions.death &&
+          this.actions.death.time >= this.actions.death.getClip().duration - 0.1) {
         this.state = "dead";
         scene.remove(this.model);
       }
-    } else if (distance < 40) { // Aggro range remains 40 units
+    } else if (distance < 40) {
       if (distance > 2) {
         if (this.state !== "running") {
           console.log(`[Enemy] Switching to RUN (dist=${distance.toFixed(2)})`);
           this.switchAction("running", 0.2);
           this.state = "running";
         }
-        const direction = new THREE.Vector3()
-          .subVectors(playerPosition, this.model.position)
-          .normalize();
+        const direction = new THREE.Vector3().subVectors(playerPosition, this.model.position).normalize();
         const angle = Math.atan2(direction.x, direction.z);
         this.model.rotation.y = angle;
         this.model.position.add(direction.multiplyScalar(5 * delta));
@@ -137,7 +149,8 @@ class Enemy {
           this.switchAction("attack", 0.2);
           this.state = "attacking";
         } else {
-          if (this.actions.attack && this.actions.attack.time >= this.actions.attack.getClip().duration - 0.1) {
+          if (this.actions.attack &&
+              this.actions.attack.time >= this.actions.attack.getClip().duration - 0.1) {
             this.actions.attack.reset().play();
           }
         }
@@ -149,7 +162,6 @@ class Enemy {
         this.state = "idle";
       }
     }
-
     if (this.mixer) this.mixer.update(delta);
   }
 
@@ -162,7 +174,6 @@ class Enemy {
     newAction.enabled = true;
     newAction.setEffectiveTimeScale(1.0);
     newAction.setEffectiveWeight(1.0);
-
     newAction.reset().play();
     for (const key in this.actions) {
       if (key !== actionName && this.actions[key] && this.actions[key].isRunning()) {
@@ -210,10 +221,8 @@ window.checkEnemyHits = function() {
   if (!window.activeProjectiles || !window.enemies) return;
   window.activeProjectiles.forEach((projectile) => {
     window.enemies.forEach((enemy) => {
-      if (
-        enemy.model &&
-        projectile.mesh.position.distanceTo(enemy.model.position) < 1.5
-      ) {
+      if (enemy.model &&
+          projectile.mesh.position.distanceTo(enemy.model.position) < 1.5) {
         enemy.takeHit();
         window.scene.remove(projectile.mesh);
         const idx = window.activeProjectiles.indexOf(projectile);

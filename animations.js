@@ -64,21 +64,31 @@ window.startSpellCast = function() {
 };
 
 //////////////////////
-// SPELL PROJECTILE (Using the Orb Model)
+// SPELL PROJECTILE (Using the Orb Model and Particle System)
 //////////////////////
 
 function spawnSpellProjectile() {
-  // Use the preloaded orb model for the projectile (instead of the old sphere).
+  // Use the preloaded orb model for the projectile
   if (!window.player || !window.scene || !window.orbModel) return;
   
-  // Create a group to hold the orb so we can position it easily.
+  // Create a group to hold the projectile
   const projectileGroup = new THREE.Group();
-
-  // Clone the orb model (already centered/had any plane hidden in loader.js).
-  const orbClone = window.orbModel.clone();
+  
+  // Deep-clone the orb model so that particle geometry isn't shared.
+  // We traverse the clone and, for any Points, clone its geometry and velocities.
+  const orbClone = window.orbModel.clone(true);
+  orbClone.traverse(child => {
+    if (child instanceof THREE.Points) {
+      child.geometry = child.geometry.clone();
+      if (child.geometry.userData && child.geometry.userData.velocities) {
+        // Clone the velocities array so that each projectile has its own set.
+        child.geometry.userData.velocities = child.geometry.userData.velocities.slice();
+      }
+    }
+  });
   projectileGroup.add(orbClone);
-
-  // Position near 3/4 of player's height, same as old projectile
+  
+  // Position near 3/4 of player's height, similar to previous implementation.
   const playerPos = window.player.position.clone();
   const forward = new THREE.Vector3(
     Math.sin(window.player.rotation.y),
@@ -92,14 +102,14 @@ function spawnSpellProjectile() {
     playerPos.z + forward.z * spawnOffsetForward
   );
   projectileGroup.lookAt(projectileGroup.position.clone().add(forward));
-
+  
   window.scene.add(projectileGroup);
-
+  
   // Projectile data
   const speed = 25;
   const life = 2.5;
   const velocity = forward.clone().multiplyScalar(speed);
-
+  
   window.activeProjectiles.push({
     mesh: projectileGroup,
     velocity,
@@ -107,51 +117,63 @@ function spawnSpellProjectile() {
     initialLife: life
   });
 }
-
+  
 window.updateSpellProjectiles = function(delta) {
   for (let i = window.activeProjectiles.length - 1; i >= 0; i--) {
     const p = window.activeProjectiles[i];
-
-    // Move forward
+  
+    // Move the projectile forward
     p.mesh.position.addScaledVector(p.velocity, delta);
-
-    // Collisions
-    checkProjectileTreeCollision(p);
-    checkProjectileBigRockCollision(p);
-
-    // Fade & remove over time
-    p.life -= delta;
-    const fadeRatio = p.life / p.initialLife;
+  
+    // Update particle positions for the magical effect.
     p.mesh.traverse(child => {
+      if (child instanceof THREE.Points) {
+        const geometry = child.geometry;
+        const positions = geometry.attributes.position.array;
+        const velocities = geometry.userData.velocities;
+        for (let j = 0; j < positions.length; j += 3) {
+          positions[j]     += velocities[j] * delta;
+          positions[j + 1] += velocities[j + 1] * delta;
+          positions[j + 2] += velocities[j + 2] * delta;
+        }
+        geometry.attributes.position.needsUpdate = true;
+      }
+      // Fade materials over time for both the orb and particles.
       if (child.material) {
-        child.material.opacity = fadeRatio;
+        child.material.opacity = p.life / p.initialLife;
         child.material.transparent = true;
       }
     });
+  
+    // Collisions
+    checkProjectileTreeCollision(p);
+    checkProjectileBigRockCollision(p);
+  
+    // Update life and remove projectile if expired.
+    p.life -= delta;
     if (p.life <= 0) {
       window.scene.remove(p.mesh);
       window.activeProjectiles.splice(i, 1);
     }
   }
 };
-
+  
 //////////////////////
 // TREE COLLISION & WOBBLE
 //////////////////////
 
 function checkProjectileTreeCollision(projectile) {
   if (!window.trees) return;
-
+  
   const projPos = projectile.mesh.position;
   const projectileRadius = 0.1;
   const treeRadius = 1.5;
   const combined = projectileRadius + treeRadius;
-
+  
   for (let i = 0; i < window.trees.length; i++) {
     const treeObj = window.trees[i];
     const dist = projPos.distanceTo(treeObj.position);
     if (dist < combined) {
-      // Collision: remove projectile
       window.scene.remove(projectile.mesh);
       const idx = window.activeProjectiles.indexOf(projectile);
       if (idx > -1) {
@@ -162,7 +184,6 @@ function checkProjectileTreeCollision(projectile) {
       if (treeObj.hitCount < 3) {
          spawnLogsFromTree(treeObj, 2);
       } else if (treeObj.hitCount === 3) {
-         // On 3rd hit, trigger falling and fading.
          treeObj.isFalling = true;
          spawnLogsFromTree(treeObj, 2);
       }
@@ -170,15 +191,14 @@ function checkProjectileTreeCollision(projectile) {
     }
   }
 }
-
-/** Wobble the tree if wobbleTime > 0 or animate falling. */
+  
 function updateTreeWobble(delta) {
   if (!window.trees) return;
   for (let i = window.trees.length - 1; i >= 0; i--) {
     const treeObj = window.trees[i];
     if (treeObj.isFalling) {
       if (treeObj.fallTime === undefined) {
-         treeObj.fallTime = 1.0; // duration for falling animation
+         treeObj.fallTime = 1.0;
       }
       treeObj.fallTime -= delta;
       treeObj.mesh.rotation.z = -Math.PI/4 * (1 - treeObj.fallTime);
@@ -205,28 +225,24 @@ function updateTreeWobble(delta) {
     }
   }
 }
-
-//////////////////////
-// SPAWNING & UPDATING LOGS (FROM TREE)
-//////////////////////
-
+  
 function spawnLogsFromTree(treeObj, count) {
   if (!window.scene || !window.logModel) return;
-
+  
   for (let i = 0; i < count; i++) {
     const logClone = window.logModel.clone();
     const spawnPos = treeObj.position.clone();
     spawnPos.y = -1 + 1.0; 
     logClone.position.copy(spawnPos);
-
+  
     window.scene.add(logClone);
-
+  
     const angle = Math.random() * Math.PI * 2;
     const speed = 5 + Math.random() * 4; 
     const vx = Math.cos(angle) * speed;
     const vz = Math.sin(angle) * speed;
     const vy = 6 + Math.random() * 2;
-
+  
     window.spawnedTreeLogs.push({
       mesh: logClone,
       velocity: new THREE.Vector3(vx, vy, vz),
@@ -236,7 +252,7 @@ function spawnLogsFromTree(treeObj, count) {
     });
   }
 }
-
+  
 window.updateFlyingLogs = function(delta) {
   if (!window.spawnedTreeLogs || !window.player) return;
   const groundY = -1;
@@ -247,7 +263,7 @@ window.updateFlyingLogs = function(delta) {
       window.spawnedTreeLogs.splice(i, 1);
       continue;
     }
-
+  
     if (!logObj.isFlyingToPlayer) {
       if (!logObj.hasLanded) {
         logObj.velocity.y -= 9.8 * delta;
@@ -281,19 +297,15 @@ window.updateFlyingLogs = function(delta) {
     }
   }
 };
-
-//////////////////////
-// BIG ROCK COLLISION & WOBBLE
-//////////////////////
-
+  
 function checkProjectileBigRockCollision(projectile) {
   if (!window.bigRocks) return;
-
+  
   const projPos = projectile.mesh.position;
   const projectileRadius = 0.1;
   const rockRadius = 1.5;
   const combined = projectileRadius + rockRadius;
-
+  
   for (let i = 0; i < window.bigRocks.length; i++) {
     const rockObj = window.bigRocks[i];
     const dist = projPos.distanceTo(rockObj.position);
@@ -314,7 +326,7 @@ function checkProjectileBigRockCollision(projectile) {
     }
   }
 }
-
+  
 function updateBigRockWobble(delta) {
   if (!window.bigRocks) return;
   for (let i = window.bigRocks.length - 1; i >= 0; i--) {
@@ -337,18 +349,14 @@ function updateBigRockWobble(delta) {
     }
   }
 }
-
-//////////////////////
-// SPAWNING & UPDATING SMALL ROCKS
-//////////////////////
-
+  
 function spawnSmallRocksFromBigRock(rockObj, count) {
   if (!window.scene || !window.smallRockModel) return;
   if (!window.spawnedSmallRocks) window.spawnedSmallRocks = [];
   for (let i = 0; i < count; i++) {
     const rockClone = window.smallRockModel.clone();
     const spawnPos = rockObj.position.clone();
-    const smallRockOffset = 0.2125; // half the small rock's height
+    const smallRockOffset = 0.2125;
     spawnPos.y = -1 + smallRockOffset;
     rockClone.position.copy(spawnPos);
     window.scene.add(rockClone);
@@ -366,7 +374,7 @@ function spawnSmallRocksFromBigRock(rockObj, count) {
     });
   }
 }
-
+  
 window.updateFlyingSmallRocks = function(delta) {
   if (!window.spawnedSmallRocks || !window.player) return;
   const groundY = -1;
@@ -411,11 +419,7 @@ window.updateFlyingSmallRocks = function(delta) {
     }
   }
 };
-
-//////////////////////
-// MAIN UPDATE
-//////////////////////
-
+  
 window.updateAnimationStates = function(delta, movement) {
   // Jump finishing and double jump reset.
   if (isJumping && activeAction === jumpAction && jumpAction.getClip()) {
@@ -423,7 +427,7 @@ window.updateAnimationStates = function(delta, movement) {
     if (!jumpSwitchTriggered && jumpAction.time >= jumpDuration - 0.1) {
       jumpSwitchTriggered = true;
       isJumping = false;
-      window.jumpCount = 0; // reset jump counter after jump completes
+      window.jumpCount = 0;
       switchAction((movement.length() > 0 ? runAction : idleAction), 0.1);
     }
   }
@@ -451,4 +455,37 @@ window.updateAnimationStates = function(delta, movement) {
   // Wobble trees & big rocks
   updateTreeWobble(delta);
   updateBigRockWobble(delta);
+};
+  
+// Function to check for collisions between the player and logs
+window.checkLogCollisions = function(player) {
+  if (!window.logObjects) return;
+  for (let i = window.logObjects.length - 1; i >= 0; i--) {
+    const log = window.logObjects[i];
+    if (player.position.distanceTo(log.position) < 3) {
+      scene.remove(log);
+      window.logObjects.splice(i, 1);
+      console.log("Log collected!");
+    }
+  }
+};
+  
+// Check for collisions between player projectiles and enemies.
+window.checkEnemyHits = function() {
+  if (!window.activeProjectiles || !window.enemies) return;
+  window.activeProjectiles.forEach((projectile) => {
+    window.enemies.forEach((enemy) => {
+      if (
+        enemy.model &&
+        projectile.mesh.position.distanceTo(enemy.model.position) < 1.5
+      ) {
+        enemy.takeHit();
+        window.scene.remove(projectile.mesh);
+        const idx = window.activeProjectiles.indexOf(projectile);
+        if (idx > -1) {
+          window.activeProjectiles.splice(idx, 1);
+        }
+      }
+    });
+  });
 };
