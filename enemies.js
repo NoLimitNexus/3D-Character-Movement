@@ -124,15 +124,25 @@ class Enemy {
 
   update(delta, playerPosition) {
     if (!this.model) return;
+
     const distance = this.model.position.distanceTo(playerPosition);
-    if (this.state === "dead") return;
+
+    if (this.state === "dead") {
+      // do nothing; the global updateEnemies function will remove us
+      return;
+    }
+
     if (this.state === "dying") {
+      // Once death animation finishes, switch to "dead" and remove the model
       if (this.actions.death &&
           this.actions.death.time >= this.actions.death.getClip().duration - 0.1) {
         this.state = "dead";
         scene.remove(this.model);
+        // We keep the object around for the global updateEnemies loop to remove from the array
+        return;
       }
     } else if (distance < 40) {
+      // If close enough, chase or attack
       if (distance > 2) {
         if (this.state !== "running") {
           console.log(`[Enemy] Switching to RUN (dist=${distance.toFixed(2)})`);
@@ -156,6 +166,7 @@ class Enemy {
         }
       }
     } else {
+      // Otherwise, idle
       if (this.state !== "idle") {
         console.log(`[Enemy] Switching to IDLE (dist=${distance.toFixed(2)})`);
         this.switchAction("idle", 0.2);
@@ -209,12 +220,26 @@ window.spawnEnemies = function(count = 10) {
   }
 };
 
+/**
+ * Updates all enemies and removes any that have fully died.
+ */
 window.updateEnemies = function(delta) {
   if (!window.enemies || !window.player) return;
   const playerPos = window.player.position.clone();
-  window.enemies.forEach((enemy) => {
+
+  // Iterate backwards so removal doesn't break indexing
+  for (let i = window.enemies.length - 1; i >= 0; i--) {
+    const enemy = window.enemies[i];
+
+    // If the enemy is fully dead, remove from array
+    if (enemy.state === "dead") {
+      window.enemies.splice(i, 1);
+      continue;
+    }
+
+    // Otherwise, update it
     enemy.update(delta, playerPos);
-  });
+  }
 };
 
 window.checkEnemyHits = function() {

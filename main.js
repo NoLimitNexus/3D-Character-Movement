@@ -44,7 +44,12 @@ function initScene() {
 
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta();
+  
+  // Clamp the time delta to avoid large jumps
+  let delta = clock.getDelta();
+  if (delta > 0.1) {
+    delta = 0.1;
+  }
 
   if (mixer) {
     mixer.update(delta);
@@ -83,14 +88,17 @@ function main() {
   initScene();
   initControls();
   initLoaders();
+
   // Spawn more enemies on the map (e.g., 30).
   if (window.spawnEnemies) {
     window.spawnEnemies(30);
   }
+
   // Initialize targeting now that renderer is created
   if (window.initTargeting) {
     window.initTargeting();
   }
+
   animate();
 }
 
