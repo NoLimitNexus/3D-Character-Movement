@@ -8,6 +8,10 @@
 // GLOBAL STATE
 //////////////////////
 
+if (module.hot) {
+  module.hot.accept();
+}
+
 window.isJumping = false;
 window.jumpSwitchTriggered = false;
 window.isSpellCasting = false;
