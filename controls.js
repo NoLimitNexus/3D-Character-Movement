@@ -212,3 +212,7 @@ function updatePlayerAndCamera(delta) {
 
 window.initControls = initControls;
 window.updatePlayerAndCamera = updatePlayerAndCamera;
+
+if (module.hot) {
+  module.hot.accept();
+}

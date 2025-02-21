@@ -521,3 +521,7 @@ window.spawnEnemies = function(count = 10) {
     window.enemies.push(enemy);
   }
 };
+
+if (module.hot) {
+  module.hot.accept();
+}

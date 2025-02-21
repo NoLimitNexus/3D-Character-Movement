@@ -113,3 +113,7 @@ function main() {
 }
 
 window.addEventListener('load', main);
+
+if (module.hot) {
+  module.hot.accept();
+}

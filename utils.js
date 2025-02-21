@@ -11,3 +11,7 @@ console.log('utils.js loaded (placeholder).');
 // window.getRandomFloat = function(min, max) {
 //   return Math.random() * (max - min) + min;
 // };
+
+if (module.hot) {
+  module.hot.accept();
+}

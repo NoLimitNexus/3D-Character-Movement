@@ -499,3 +499,7 @@ window.checkEnemyHits = function() {
     });
   });
 };
+
+if (module.hot) {
+  module.hot.accept();
+}
