@@ -1,3 +1,4 @@
+//
 // enemies.js
 // Handles spawning and updating enemies that stand randomly around the map.
 // Enemies will run at the player and attack if the player gets near.
@@ -5,7 +6,9 @@
 
 window.enemies = [];
 
-// Enemy class definition.
+// ----------------------------------------------------------------------
+// Aggressive Enemy Class (used for most enemy spawns)
+// ----------------------------------------------------------------------
 class Enemy {
   constructor(position) {
     this.position = position.clone();
@@ -204,21 +207,203 @@ class Enemy {
   }
 }
 
-window.spawnEnemies = function(count = 10) {
-  window.enemies = window.enemies || [];
-  for (let i = 0; i < count; i++) {
-    let pos;
-    do {
-      pos = new THREE.Vector3(
-        THREE.MathUtils.randFloatSpread(500),
-        -1,
-        THREE.MathUtils.randFloatSpread(500)
+// ----------------------------------------------------------------------
+// Zombie Class (extends Enemy)
+// The first enemy spawned will be a zombie that, when the player is far,
+// will occasionally wander around using its running animation.
+// ----------------------------------------------------------------------
+class Zombie extends Enemy {
+  constructor(position) {
+    super(position);
+    this.isWandering = false;
+    this.wanderTimer = 0;
+    this.wanderDirection = new THREE.Vector3(0, 0, 0);
+  }
+  update(delta, playerPosition) {
+    if (!this.model) return;
+    const distance = this.model.position.distanceTo(playerPosition);
+    // If player is near, behave aggressively.
+    if (distance < 30) {
+      super.update(delta, playerPosition);
+      this.isWandering = false;
+      this.wanderTimer = 0;
+      return;
+    }
+    // Otherwise, wander occasionally.
+    if (!this.isWandering) {
+      // 1% chance per frame to start wandering.
+      if (Math.random() < 0.01) {
+        this.isWandering = true;
+        const angle = Math.random() * Math.PI * 2;
+        this.wanderDirection.set(Math.sin(angle), 0, Math.cos(angle));
+        this.wanderTimer = 3 + Math.random() * 3;
+        // Switch to running animation when wandering
+        this.switchAction("running", 0.2);
+      } else {
+        if (this.state !== "idle") {
+          this.switchAction("idle", 0.2);
+          this.state = "idle";
+        }
+      }
+    } else {
+      // Wander in the chosen direction using running animation.
+      const speed = 5; // zombies wander at normal run speed
+      this.model.position.add(this.wanderDirection.clone().multiplyScalar(speed * delta));
+      if (this.wanderDirection.lengthSq() > 0.0001) {
+        const desiredAngle = Math.atan2(this.wanderDirection.x, this.wanderDirection.z);
+        this.model.rotation.y = desiredAngle;
+      }
+      this.wanderTimer -= delta;
+      if (this.wanderTimer <= 0) {
+        this.isWandering = false;
+        this.switchAction("idle", 0.2);
+      }
+    }
+    if (this.mixer) this.mixer.update(delta);
+  }
+}
+
+// ----------------------------------------------------------------------
+// WanderingMonster Class for Wood and Rock Golems
+// ----------------------------------------------------------------------
+class WanderingMonster {
+  constructor(position, type) {
+    this.position = position.clone();
+    this.type = type; // "wood" or "rock"
+    this.state = "wandering";
+    this.model = null;
+    this.mixer = null;
+    this.changeDirectionTimer = 0;
+    this.walkDirection = new THREE.Vector3(0, 0, 0);
+    this.loadModel();
+  }
+
+  loadModel() {
+    const loader = new THREE.FBXLoader();
+    if (this.type === "wood") {
+      loader.load(
+        "https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/WoodCreatureWalking.fbx",
+        (object) => {
+          console.log("[WanderingMonster] Wood Golem model loaded (walking).");
+          this.model = object;
+          // Wood golem is now 4x bigger: scale from 0.025 to 0.1.
+          this.model.scale.set(0.1, 0.1, 0.1);
+          this.model.position.copy(this.position);
+          scene.add(this.model);
+          this.mixer = new THREE.AnimationMixer(this.model);
+          if (object.animations && object.animations.length > 0) {
+            this.action = this.mixer.clipAction(object.animations[0]);
+            this.action.play();
+          } else {
+            console.warn("[WanderingMonster] No walking animation found for Wood Golem.");
+          }
+        },
+        undefined,
+        (error) => {
+          console.error("[WanderingMonster] Error loading Wood Golem model:", error);
+        }
       );
-    } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
-    const enemy = new Enemy(pos);
-    window.enemies.push(enemy);
+    } else if (this.type === "rock") {
+      // This link is intentionally the same as the "Crouch Idle" file,
+      // but we are treating it as the Rock Golem's walking animation.
+      loader.load(
+        "https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/rockgolemwalking1.fbx",
+        (object) => {
+          console.log("[WanderingMonster] Rock Golem model loaded (walking).");
+          this.model = object;
+          // Increase scale for better visibility.
+          this.model.scale.set(0.1, 0.1, 0.1);
+          this.model.position.copy(this.position);
+          scene.add(this.model);
+          this.mixer = new THREE.AnimationMixer(this.model);
+          if (object.animations && object.animations.length > 0) {
+            this.action = this.mixer.clipAction(object.animations[0]);
+            this.action.play();
+          } else {
+            console.warn("[WanderingMonster] No walking animation found for Rock Golem.");
+          }
+        },
+        undefined,
+        (error) => {
+          console.error("[WanderingMonster] Error loading Rock Golem model:", error);
+        }
+      );
+    }
+  }
+
+  update(delta) {
+    if (!this.model) return;
+    if (this.mixer) this.mixer.update(delta);
+
+    // Change direction at random intervals.
+    this.changeDirectionTimer -= delta;
+    if (this.changeDirectionTimer <= 0) {
+      const angle = Math.random() * Math.PI * 2;
+      this.walkDirection.set(Math.sin(angle), 0, Math.cos(angle));
+      this.changeDirectionTimer = 2 + Math.random() * 3;
+    }
+
+    // Determine speed based on type.
+    let speed = 2; // default speed
+    if (this.type === "wood") {
+      speed = 1; // wood golem moves slower
+    } else if (this.type === "rock") {
+      speed = 7; // rock golem moves faster
+    }
+    // Move in the chosen direction.
+    this.model.position.add(this.walkDirection.clone().multiplyScalar(speed * delta));
+
+    // Update model rotation to face movement direction.
+    if (this.walkDirection.lengthSq() > 0.0001) {
+      const desiredAngle = Math.atan2(this.walkDirection.x, this.walkDirection.z);
+      this.model.rotation.y = desiredAngle;
+    }
+
+    // Enforce map boundaries (-250 to 250 for x and z).
+    const boundary = 250;
+    if (this.model.position.x > boundary) {
+      this.model.position.x = boundary;
+      this.walkDirection.x = -Math.abs(this.walkDirection.x);
+    }
+    if (this.model.position.x < -boundary) {
+      this.model.position.x = -boundary;
+      this.walkDirection.x = Math.abs(this.walkDirection.x);
+    }
+    if (this.model.position.z > boundary) {
+      this.model.position.z = boundary;
+      this.walkDirection.z = -Math.abs(this.walkDirection.z);
+    }
+    if (this.model.position.z < -boundary) {
+      this.model.position.z = -boundary;
+      this.walkDirection.z = Math.abs(this.walkDirection.z);
+    }
+  }
+}
+
+window.wanderingMonsters = [];
+
+// Spawn 5 Wood Golems and 5 Rock Golems.
+window.spawnWanderingMonsters = function() {
+  for (let i = 0; i < 5; i++) {
+    let posWood = new THREE.Vector3(
+      THREE.MathUtils.randFloat(-200, 200),
+      -1,
+      THREE.MathUtils.randFloat(-200, 200)
+    );
+    let posRock = new THREE.Vector3(
+      THREE.MathUtils.randFloat(-200, 200),
+      -1,
+      THREE.MathUtils.randFloat(-200, 200)
+    );
+    const woodGolem = new WanderingMonster(posWood, "wood");
+    const rockGolem = new WanderingMonster(posRock, "rock");
+    window.wanderingMonsters.push(woodGolem, rockGolem);
   }
 };
+
+// ----------------------------------------------------------------------
+// Global update functions
+// ----------------------------------------------------------------------
 
 /**
  * Updates all enemies and removes any that have fully died.
@@ -257,4 +442,26 @@ window.checkEnemyHits = function() {
       }
     });
   });
+};
+
+window.spawnEnemies = function(count = 10) {
+  window.enemies = window.enemies || [];
+  for (let i = 0; i < count; i++) {
+    let pos;
+    do {
+      pos = new THREE.Vector3(
+        THREE.MathUtils.randFloatSpread(500),
+        -1,
+        THREE.MathUtils.randFloatSpread(500)
+      );
+    } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
+    let enemy;
+    if (i === 0) {
+      // The first enemy is a Zombie.
+      enemy = new Zombie(pos);
+    } else {
+      enemy = new Enemy(pos);
+    }
+    window.enemies.push(enemy);
+  }
 };

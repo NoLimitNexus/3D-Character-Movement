@@ -56,7 +56,7 @@ function animate() {
   }
   updatePlayerAndCamera(delta);
 
-  // Also update small rocks spawned from big rocks.
+  // Update small rocks spawned from big rocks.
   if (window.updateFlyingSmallRocks) {
     window.updateFlyingSmallRocks(delta);
   }
@@ -67,6 +67,11 @@ function animate() {
   }
   if (window.checkEnemyHits) {
     window.checkEnemyHits();
+  }
+
+  // Update wandering monsters (Wood and Rock Golems).
+  if (window.wanderingMonsters) {
+    window.wanderingMonsters.forEach(monster => monster.update(delta));
   }
 
   // Continuously update the target outline position if targeting is active.
@@ -89,9 +94,14 @@ function main() {
   initControls();
   initLoaders();
 
-  // Spawn more enemies on the map (e.g., 30).
+  // Spawn aggressive enemies (first one is a zombie).
   if (window.spawnEnemies) {
     window.spawnEnemies(30);
+  }
+  
+  // Spawn wandering monsters (5 Wood Golems and 5 Rock Golems).
+  if (window.spawnWanderingMonsters) {
+    window.spawnWanderingMonsters();
   }
 
   // Initialize targeting now that renderer is created

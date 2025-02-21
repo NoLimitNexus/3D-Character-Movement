@@ -269,7 +269,7 @@ gltfLoader.load(
   'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Small%20Rock.glb',
   function(gltf) {
     window.droneModel = gltf.scene;
-    window.droneModel.scale.set(0.0425, 0.0425, 0.0425);
+    window.droneModel.scale.set(0.4, 0.4, 0.4);
     resourceLoaded();
   },
   function(xhr) {
@@ -393,10 +393,6 @@ gltfLoader.load(
 );
 }
 
-function spawnDroneExample() {
-if (!window.droneModel) return;
-spawnDrone(new THREE.Vector3(0, 1, 0));
-}
 
 function initLoaders() {
 tipInterval = setInterval(showRandomTip, 3000);
@@ -408,7 +404,5 @@ loadTrees();
 loadLogs();
 loadBigRocks();
 loadOrbModel();
-loadDroneModel();
 
-setTimeout(spawnDroneExample, 5000);
 }
