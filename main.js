@@ -64,6 +64,11 @@ function animate() {
     window.checkEnemyHits();
   }
 
+  // Continuously update the target outline position if targeting is active.
+  if (window.updateTargetOutline) {
+    window.updateTargetOutline();
+  }
+
   renderer.render(scene, camera);
 }
 
@@ -81,6 +86,10 @@ function main() {
   // Spawn more enemies on the map (e.g., 30).
   if (window.spawnEnemies) {
     window.spawnEnemies(30);
+  }
+  // Initialize targeting now that renderer is created
+  if (window.initTargeting) {
+    window.initTargeting();
   }
   animate();
 }

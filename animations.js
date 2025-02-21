@@ -96,19 +96,29 @@ function spawnSpellProjectile() {
     Math.cos(window.player.rotation.y)
   );
   const spawnOffsetForward = 1.0;
-  projectileGroup.position.set(
+  const spawnPos = new THREE.Vector3(
     playerPos.x + forward.x * spawnOffsetForward,
     playerPos.y + 0.75,
     playerPos.z + forward.z * spawnOffsetForward
   );
-  projectileGroup.lookAt(projectileGroup.position.clone().add(forward));
+  projectileGroup.position.copy(spawnPos);
+  
+  // Determine direction: if a target is selected, cast toward the target; otherwise, use player's forward direction.
+  let targetDirection;
+  if (window.currentTarget && window.currentTarget.position) {
+    targetDirection = window.currentTarget.position.clone().sub(spawnPos).normalize();
+  } else {
+    targetDirection = forward;
+  }
+  
+  projectileGroup.lookAt(spawnPos.clone().add(targetDirection));
   
   window.scene.add(projectileGroup);
   
   // Projectile data
   const speed = 25;
   const life = 2.5;
-  const velocity = forward.clone().multiplyScalar(speed);
+  const velocity = targetDirection.clone().multiplyScalar(speed);
   
   window.activeProjectiles.push({
     mesh: projectileGroup,
