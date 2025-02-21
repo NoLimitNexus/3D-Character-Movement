@@ -17,7 +17,31 @@ class Enemy {
     this.model = null;
     this.mixer = null;
     this.actions = {}; // { idle, running, attack, death }
+    this.aggroTimer = 0; // timer for showing health bar (in seconds)
+    this.healthBar = null; // will hold the health bar sprite
     this.loadModel();
+  }
+
+  createHealthBar() {
+    // Create a canvas-based texture for the health bar.
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 16;
+    const context = canvas.getContext('2d');
+    // Draw a full red bar.
+    context.fillStyle = 'red';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 1
+    });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    // Scale and position the health bar above the enemy’s head.
+    sprite.scale.set(2, 0.25, 1);
+    sprite.position.set(0, 2, 0); // adjust Y offset as needed
+    return sprite;
   }
 
   loadModel() {
@@ -42,6 +66,11 @@ class Enemy {
         } else {
           console.warn("[Enemy] No idle animation found in Crouch Idle FBX.");
         }
+
+        // Create and attach a health bar to the enemy; initially hidden.
+        this.healthBar = this.createHealthBar();
+        this.healthBar.visible = false;
+        this.model.add(this.healthBar);
 
         this.loadAnimations();
       },
@@ -130,6 +159,11 @@ class Enemy {
 
     const distance = this.model.position.distanceTo(playerPosition);
 
+    // Aggro logic: if player gets close, reset aggro timer (10 seconds)
+    if (distance < 40) {
+      this.aggroTimer = 10;
+    }
+
     if (this.state === "dead") {
       // do nothing; the global updateEnemies function will remove us
       return;
@@ -177,6 +211,12 @@ class Enemy {
       }
     }
     if (this.mixer) this.mixer.update(delta);
+
+    // Update health bar visibility (always visible)
+    if (this.healthBar) {
+      this.healthBar.visible = true;
+      this.healthBar.material.opacity = 1;
+    }
   }
 
   switchAction(actionName, fadeDuration) {
@@ -219,6 +259,16 @@ class Zombie extends Enemy {
     this.wanderTimer = 0;
     this.wanderDirection = new THREE.Vector3(0, 0, 0);
   }
+
+  // Override createHealthBar to increase the scale for Zombie
+  createHealthBar() {
+    // Call the parent method to create the health bar sprite.
+    const sprite = super.createHealthBar();
+    // Because the model scale is 0.025, increase the sprite's scale so it’s visible.
+    sprite.scale.set(80, 10, 1); // adjust values as needed
+    return sprite;
+  }
+
   update(delta, playerPosition) {
     if (!this.model) return;
     const distance = this.model.position.distanceTo(playerPosition);
@@ -227,39 +277,45 @@ class Zombie extends Enemy {
       super.update(delta, playerPosition);
       this.isWandering = false;
       this.wanderTimer = 0;
-      return;
-    }
-    // Otherwise, wander occasionally.
-    if (!this.isWandering) {
-      // 1% chance per frame to start wandering.
-      if (Math.random() < 0.01) {
-        this.isWandering = true;
-        const angle = Math.random() * Math.PI * 2;
-        this.wanderDirection.set(Math.sin(angle), 0, Math.cos(angle));
-        this.wanderTimer = 3 + Math.random() * 3;
-        // Switch to running animation when wandering
-        this.switchAction("running", 0.2);
+    } else {
+      // Otherwise, wander occasionally.
+      if (!this.isWandering) {
+        // 1% chance per frame to start wandering.
+        if (Math.random() < 0.01) {
+          this.isWandering = true;
+          const angle = Math.random() * Math.PI * 2;
+          this.wanderDirection.set(Math.sin(angle), 0, Math.cos(angle));
+          this.wanderTimer = 3 + Math.random() * 3;
+          // Switch to running animation when wandering.
+          this.switchAction("running", 0.2);
+        } else {
+          if (this.state !== "idle") {
+            this.switchAction("idle", 0.2);
+            this.state = "idle";
+          }
+        }
       } else {
-        if (this.state !== "idle") {
+        // Wander in the chosen direction using running animation.
+        const speed = 5; // zombies wander at normal run speed.
+        this.model.position.add(this.wanderDirection.clone().multiplyScalar(speed * delta));
+        if (this.wanderDirection.lengthSq() > 0.0001) {
+          const desiredAngle = Math.atan2(this.wanderDirection.x, this.wanderDirection.z);
+          this.model.rotation.y = desiredAngle;
+        }
+        this.wanderTimer -= delta;
+        if (this.wanderTimer <= 0) {
+          this.isWandering = false;
           this.switchAction("idle", 0.2);
-          this.state = "idle";
         }
       }
-    } else {
-      // Wander in the chosen direction using running animation.
-      const speed = 5; // zombies wander at normal run speed
-      this.model.position.add(this.wanderDirection.clone().multiplyScalar(speed * delta));
-      if (this.wanderDirection.lengthSq() > 0.0001) {
-        const desiredAngle = Math.atan2(this.wanderDirection.x, this.wanderDirection.z);
-        this.model.rotation.y = desiredAngle;
-      }
-      this.wanderTimer -= delta;
-      if (this.wanderTimer <= 0) {
-        this.isWandering = false;
-        this.switchAction("idle", 0.2);
-      }
+      if (this.mixer) this.mixer.update(delta);
     }
-    if (this.mixer) this.mixer.update(delta);
+    
+    // Always show the health bar at full opacity.
+    if (this.healthBar) {
+      this.healthBar.visible = true;
+      this.healthBar.material.opacity = 1;
+    }
   }
 }
 

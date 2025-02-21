@@ -358,39 +358,44 @@ gltfLoader.load(
 }
 
 function loadBigRocks() {
-const gltfLoader = new THREE.GLTFLoader();
-if (!window.bigRocks) window.bigRocks = [];
-gltfLoader.load(
-  'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/Big%20Rock.glb',
-  function(gltf) {
-    const rockModel = gltf.scene;
-    rockModel.scale.set(0.20, 0.20, 0.20);
-    const numRocks = 20;
-    window.bigRockPositions = [];
-    for (let i = 0; i < numRocks; i++) {
-      let pos;
-      do {
-        pos = new THREE.Vector3(
-          THREE.MathUtils.randFloatSpread(500),
-          -1,
-          THREE.MathUtils.randFloatSpread(500)
-        );
-      } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
-      const rockClone = rockModel.clone();
-      rockClone.position.copy(pos);
-      scene.add(rockClone);
-      window.bigRocks.push({ mesh: rockClone, position: pos.clone(), wobbleTime: 0 });
-      window.bigRockPositions.push(pos.clone());
+  const gltfLoader = new THREE.GLTFLoader();
+  if (!window.bigRocks) window.bigRocks = [];
+  gltfLoader.load(
+    'https://raw.githack.com/NoLimitNexus/Utilities/refs/heads/main/glowing_rock.glb',
+    function(gltf) {
+      const rockModel = gltf.scene;
+      rockModel.scale.set(0.10, 0.10, 0.10);
+      const numRocks = 20;
+      window.bigRockPositions = [];
+      for (let i = 0; i < numRocks; i++) {
+        let pos;
+        do {
+          pos = new THREE.Vector3(
+            THREE.MathUtils.randFloatSpread(500),
+            -1,
+            THREE.MathUtils.randFloatSpread(500)
+          );
+        } while (pos.distanceTo(new THREE.Vector3(0, -1, 0)) < 50);
+        const rockClone = rockModel.clone();
+        rockClone.position.copy(pos);
+        // Adjust rockClone's y so that its bottom touches the ground (which is at y = -1)
+        rockClone.updateMatrixWorld(true);
+        const bbox = new THREE.Box3().setFromObject(rockClone);
+        const rockHeight = bbox.max.y - bbox.min.y;
+        rockClone.position.y = -1 + rockHeight / 2;
+        scene.add(rockClone);
+        window.bigRocks.push({ mesh: rockClone, position: rockClone.position.clone(), wobbleTime: 0 });
+        window.bigRockPositions.push(rockClone.position.clone());
+      }
+      resourceLoaded();
+    },
+    function(xhr) {
+      console.log('Big Rock model: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    function(error) {
+      console.error('Error loading Big Rock model:', error);
     }
-    resourceLoaded();
-  },
-  function(xhr) {
-    console.log('Big Rock model: ' + (xhr.loaded / xhr.total * 100) + '% loaded');
-  },
-  function(error) {
-    console.error('Error loading Big Rock model:', error);
-  }
-);
+  );
 }
 
 
