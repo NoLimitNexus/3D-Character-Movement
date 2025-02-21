@@ -26,7 +26,7 @@ class Enemy {
         console.log("[Enemy] Idle model loaded OK.");
         this.model = object;
         // Make the orc half its original size (was 0.01, now 0.005)
-        this.model.scale.set(0.005, 0.005, 0.005);
+        this.model.scale.set(0.025, 0.025, 0.025);
         this.model.position.copy(this.position);
         scene.add(this.model);
 

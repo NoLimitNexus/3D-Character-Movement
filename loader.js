@@ -4,9 +4,6 @@
 // shows rotating tips, and adds them to the scene.
 //
 
-//////////////////////////
-// Patch FBXLoader to Skip ShininessExponent
-//////////////////////////
 (function() {
     const originalParseMaterial = THREE.FBXLoader.prototype.parseMaterial;
     THREE.FBXLoader.prototype.parseMaterial = function(materialNode) {
@@ -176,7 +173,6 @@
     );
   }
   
-  /** The old FBX-based spell cast for the character's arms/body. */
   function loadSpellAnimation(fbxLoader) {
     fbxLoader.load(
       'https://raw.githubusercontent.com/NoLimitNexus/Utilities/main/spell1.fbx',
@@ -207,15 +203,16 @@
     );
   }
   
-  /** Create a glowing blue semi-transparent metaball for the player's projectile. */
+  // Updated orb model: bright orange and glowing.
   function loadOrbModel() {
     const geometry = new THREE.SphereGeometry(0.5, 32, 32);
     const material = new THREE.MeshPhongMaterial({
-      color: 0x0000ff,
-      emissive: 0x0000ff,
+      color: 0xff6600,           // Bright orange color
+      emissive: 0xff6600,        // Same for emissive to create glow
+      emissiveIntensity: 1.0,    // Strong glow effect
       transparent: true,
-      opacity: 0.6,
-      shininess: 100,
+      opacity: 0.9,
+      shininess: 200,
       side: THREE.DoubleSide,
       depthWrite: false,
       blending: THREE.AdditiveBlending
@@ -224,7 +221,6 @@
     resourceLoaded();
   }
   
-  /** Load the small rock "drone" model, scaled down 10x. */
   function loadDroneModel() {
     const gltfLoader = new THREE.GLTFLoader();
     gltfLoader.load(
@@ -243,7 +239,6 @@
     );
   }
   
-  /** Load the tree model. */
   function loadTrees() {
     const gltfLoader = new THREE.GLTFLoader();
     if (!window.trees) window.trees = [];
@@ -286,7 +281,6 @@
     );
   }
   
-  /** Load the log model. */
   function loadLogs() {
     const gltfLoader = new THREE.GLTFLoader();
     gltfLoader.load(
@@ -321,7 +315,6 @@
     );
   }
   
-  /** Load big rocks. */
   function loadBigRocks() {
     const gltfLoader = new THREE.GLTFLoader();
     if (!window.bigRocks) window.bigRocks = [];
@@ -358,17 +351,11 @@
     );
   }
   
-  /**
-   * Example of how you might spawn a drone in the world.
-   * This is just an example. You can remove or change it.
-   */
   function spawnDroneExample() {
     if (!window.droneModel) return;
-    // For example, spawn one drone near the origin:
     spawnDrone(new THREE.Vector3(0, 1, 0));
   }
   
-  /** Called once all loaders are set up. */
   function initLoaders() {
     tipInterval = setInterval(showRandomTip, 3000);
     showRandomTip();
@@ -381,6 +368,5 @@
     loadOrbModel();
     loadDroneModel();
   
-    // Wait a moment, then spawn an example drone
     setTimeout(spawnDroneExample, 5000);
   }
